@@ -1,0 +1,1121 @@
+# Database Queries for Inventory Management System
+
+## Table of Contents
+1. SQL Queries (Relational Database - PostgreSQL/MySQL/SQLite)
+2. Non-SQL Queries (NoSQL - MongoDB)
+3. Advanced Analytics Queries
+4. Performance Optimization Queries
+
+================================================================================
+## 1. SQL QUERIES (PostgreSQL/MySQL/SQLite)
+================================================================================
+
+### Database Schema Creation
+
+-- Create Categories Table
+CREATE TABLE categories (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create Inventory Table
+CREATE TABLE inventory (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+    quantity INTEGER NOT NULL DEFAULT 0,
+    price DECIMAL(10,2) NOT NULL,
+    description TEXT,
+    sku VARCHAR(50) UNIQUE,
+    min_stock_level INTEGER DEFAULT 5,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create Orders Table
+CREATE TABLE orders (
+    id SERIAL PRIMARY KEY,
+    customer_name VARCHAR(200) NOT NULL,
+    customer_email VARCHAR(255),
+    customer_phone VARCHAR(20),
+    status VARCHAR(50) DEFAULT 'pending',
+    total DECIMAL(10,2) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create Order Items Table
+CREATE TABLE order_items (
+    id SERIAL PRIMARY KEY,
+    order_id INTEGER REFERENCES orders(id) ON DELETE CASCADE,
+    inventory_id INTEGER REFERENCES inventory(id) ON DELETE CASCADE,
+    quantity INTEGER NOT NULL,
+    unit_price DECIMAL(10,2) NOT NULL,
+    total_price DECIMAL(10,2) NOT NULL
+);
+
+-- Create Users Table
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) DEFAULT 'user',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login TIMESTAMP
+);
+
+-- Create Audit Log Table
+CREATE TABLE audit_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    action VARCHAR(100) NOT NULL,
+    table_name VARCHAR(50),
+    record_id INTEGER,
+    old_values JSONB,
+    new_values JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+### Basic CRUD Operations
+
+-- INSERT Operations
+-- Add new category
+INSERT INTO categories (name, description)
+VALUES ('Electronics', 'Electronic devices and components');
+
+-- Add new inventory item
+INSERT INTO inventory (name, category_id, quantity, price, description, sku, min_stock_level)
+VALUES ('Laptop XPS 15', 1, 25, 1299.99, 'High-performance laptop', 'LAP-XPS-15-001', 5);
+
+-- Add new order
+INSERT INTO orders (customer_name, customer_email, status, total)
+VALUES ('John Doe', 'john@example.com', 'pending', 1299.99);
+
+-- Add order items
+INSERT INTO order_items (order_id, inventory_id, quantity, unit_price, total_price)
+VALUES (1, 1, 1, 1299.99, 1299.99);
+
+-- SELECT Operations
+-- Get all inventory items with category names
+SELECT 
+    i.id,
+    i.name,
+    c.name as category_name,
+    i.quantity,
+    i.price,
+    i.description,
+    i.sku,
+    CASE 
+        WHEN i.quantity <= i.min_stock_level THEN 'Low Stock'
+        WHEN i.quantity = 0 THEN 'Out of Stock'
+        ELSE 'In Stock'
+    END as status
+FROM inventory i
+LEFT JOIN categories c ON i.category_id = c.id
+ORDER BY i.name;
+
+-- Get low stock items
+SELECT 
+    i.name,
+    i.quantity,
+    i.min_stock_level,
+    c.name as category
+FROM inventory i
+LEFT JOIN categories c ON i.category_id = c.id
+WHERE i.quantity <= i.min_stock_level;
+
+-- Get orders with items
+SELECT 
+    o.id as order_id,
+    o.customer_name,
+    o.status,
+    o.total,
+    o.created_at,
+    COUNT(oi.id) as item_count
+FROM orders o
+LEFT JOIN order_items oi ON o.id = oi.order_id
+GROUP BY o.id, o.customer_name, o.status, o.total, o.created_at
+ORDER BY o.created_at DESC;
+
+-- UPDATE Operations
+-- Update inventory quantity
+UPDATE inventory 
+SET quantity = quantity - 1, updated_at = CURRENT_TIMESTAMP
+WHERE id = 1;
+
+-- Update order status
+UPDATE orders 
+SET status = 'completed', updated_at = CURRENT_TIMESTAMP
+WHERE id = 1;
+
+-- UPDATE inventory price
+UPDATE inventory 
+SET price = 1199.99, updated_at = CURRENT_TIMESTAMP
+WHERE id = 1;
+
+-- DELETE Operations
+-- Delete order item
+DELETE FROM order_items WHERE id = 1;
+
+-- Delete order (cascade will delete order items)
+DELETE FROM orders WHERE id = 1;
+
+-- Soft delete inventory item (mark as inactive)
+ALTER TABLE inventory ADD COLUMN is_active BOOLEAN DEFAULT TRUE;
+UPDATE inventory SET is_active = FALSE WHERE id = 1;
+
+### Advanced Queries
+
+-- Inventory Analytics
+-- Total inventory value by category
+SELECT 
+    c.name as category,
+    COUNT(i.id) as item_count,
+    SUM(i.quantity * i.price) as total_value,
+    AVG(i.price) as avg_price
+FROM categories c
+LEFT JOIN inventory i ON c.id = i.category_id
+GROUP BY c.id, c.name
+ORDER BY total_value DESC;
+
+-- Monthly sales report
+SELECT 
+    DATE_TRUNC('month', o.created_at) as month,
+    COUNT(o.id) as order_count,
+    SUM(o.total) as total_revenue,
+    AVG(o.total) as avg_order_value
+FROM orders o
+WHERE o.status = 'completed'
+GROUP BY DATE_TRUNC('month', o.created_at)
+ORDER BY month DESC;
+
+-- Top selling products
+SELECT 
+    i.name,
+    SUM(oi.quantity) as total_sold,
+    SUM(oi.total_price) as total_revenue
+FROM inventory i
+JOIN order_items oi ON i.id = oi.inventory_id
+JOIN orders o ON oi.order_id = o.id
+WHERE o.status = 'completed'
+GROUP BY i.id, i.name
+ORDER BY total_sold DESC
+LIMIT 10;
+
+-- Customer analysis
+SELECT 
+    o.customer_name,
+    COUNT(o.id) as order_count,
+    SUM(o.total) as total_spent,
+    AVG(o.total) as avg_order_value,
+    MAX(o.created_at) as last_order_date
+FROM orders o
+WHERE o.status = 'completed'
+GROUP BY o.customer_name
+ORDER BY total_spent DESC;
+
+-- Inventory turnover analysis
+SELECT 
+    i.name,
+    i.quantity as current_stock,
+    COALESCE(SUM(oi.quantity), 0) as total_sold,
+    CASE 
+        WHEN i.quantity > 0 THEN COALESCE(SUM(oi.quantity), 0) / NULLIF(i.quantity, 0)
+        ELSE 0
+    END as turnover_ratio
+FROM inventory i
+LEFT JOIN order_items oi ON i.id = oi.inventory_id
+LEFT JOIN orders o ON oi.order_id = o.id
+WHERE o.status = 'completed' OR o.status IS NULL
+GROUP BY i.id, i.name, i.quantity
+ORDER BY turnover_ratio DESC;
+
+-- Daily sales trends
+SELECT 
+    DATE(o.created_at) as sale_date,
+    COUNT(o.id) as order_count,
+    SUM(o.total) as daily_revenue,
+    AVG(o.total) as avg_order_value
+FROM orders o
+WHERE o.status = 'completed'
+    AND o.created_at >= CURRENT_DATE - INTERVAL '30 days'
+GROUP BY DATE(o.created_at)
+ORDER BY sale_date DESC;
+
+-- Category performance
+SELECT 
+    c.name as category,
+    COUNT(DISTINCT oi.inventory_id) as products_sold,
+    SUM(oi.quantity) as total_quantity_sold,
+    SUM(oi.total_price) as category_revenue,
+    AVG(oi.unit_price) as avg_selling_price
+FROM categories c
+JOIN inventory i ON c.id = i.category_id
+JOIN order_items oi ON i.id = oi.inventory_id
+JOIN orders o ON oi.order_id = o.id
+WHERE o.status = 'completed'
+GROUP BY c.id, c.name
+ORDER BY category_revenue DESC;
+
+================================================================================
+## 2. NON-SQL QUERIES (MongoDB)
+================================================================================
+
+### Collection Structure
+
+// Categories Collection
+{
+  "_id": ObjectId("..."),
+  "name": "Electronics",
+  "description": "Electronic devices and components",
+  "createdAt": ISODate("..."),
+  "updatedAt": ISODate("...")
+}
+
+// Inventory Collection
+{
+  "_id": ObjectId("..."),
+  "name": "Laptop XPS 15",
+  "categoryId": ObjectId("..."),
+  "category": "Electronics",
+  "quantity": 25,
+  "price": 1299.99,
+  "description": "High-performance laptop",
+  "sku": "LAP-XPS-15-001",
+  "minStockLevel": 5,
+  "isActive": true,
+  "createdAt": ISODate("..."),
+  "updatedAt": ISODate("...")
+}
+
+// Orders Collection
+{
+  "_id": ObjectId("..."),
+  "orderNumber": "ORD-000001",
+  "customer": {
+    "name": "John Doe",
+    "email": "john@example.com",
+    "phone": "+1234567890"
+  },
+  "items": [
+    {
+      "inventoryId": ObjectId("..."),
+      "productName": "Laptop XPS 15",
+      "quantity": 1,
+      "unitPrice": 1299.99,
+      "totalPrice": 1299.99
+    }
+  ],
+  "status": "completed",
+  "total": 1299.99,
+  "createdAt": ISODate("..."),
+  "updatedAt": ISODate("...")
+}
+
+### Basic CRUD Operations
+
+// INSERT Operations
+// Add new category
+db.categories.insertOne({
+  name: "Electronics",
+  description: "Electronic devices and components",
+  createdAt: new Date(),
+  updatedAt: new Date()
+});
+
+// Add new inventory item
+db.inventory.insertOne({
+  name: "Laptop XPS 15",
+  categoryId: ObjectId("category_id_here"),
+  category: "Electronics",
+  quantity: 25,
+  price: 1299.99,
+  description: "High-performance laptop",
+  sku: "LAP-XPS-15-001",
+  minStockLevel: 5,
+  isActive: true,
+  createdAt: new Date(),
+  updatedAt: new Date()
+});
+
+// Add new order
+db.orders.insertOne({
+  orderNumber: "ORD-000001",
+  customer: {
+    name: "John Doe",
+    email: "john@example.com",
+    phone: "+1234567890"
+  },
+  items: [
+    {
+      inventoryId: ObjectId("inventory_id_here"),
+      productName: "Laptop XPS 15",
+      quantity: 1,
+      unitPrice: 1299.99,
+      totalPrice: 1299.99
+    }
+  ],
+  status: "pending",
+  total: 1299.99,
+  createdAt: new Date(),
+  updatedAt: new Date()
+});
+
+// SELECT Operations
+// Get all inventory items
+db.inventory.find({ isActive: true }).sort({ name: 1 });
+
+// Get low stock items
+db.inventory.find({
+  $expr: { $lte: ["$quantity", "$minStockLevel"] },
+  isActive: true
+});
+
+// Get inventory by category
+db.inventory.find({ category: "Electronics", isActive: true });
+
+// Get orders with pagination
+db.orders.find().sort({ createdAt: -1 }).limit(10).skip(0);
+
+// UPDATE Operations
+// Update inventory quantity
+db.inventory.updateOne(
+  { _id: ObjectId("inventory_id_here") },
+  { 
+    $inc: { quantity: -1 },
+    $set: { updatedAt: new Date() }
+  }
+);
+
+// Update order status
+db.orders.updateOne(
+  { _id: ObjectId("order_id_here") },
+  { 
+    $set: { 
+      status: "completed",
+      updatedAt: new Date()
+    }
+  }
+);
+
+// UPDATE multiple items
+db.inventory.updateMany(
+  { category: "Electronics" },
+  { $mul: { price: 0.9 } } // 10% discount
+);
+
+// DELETE Operations
+// Soft delete inventory item
+db.inventory.updateOne(
+  { _id: ObjectId("inventory_id_here") },
+  { $set: { isActive: false, updatedAt: new Date() } }
+);
+
+// Delete order
+db.orders.deleteOne({ _id: ObjectId("order_id_here") });
+
+### Advanced Aggregation Queries
+
+// Total inventory value by category
+db.inventory.aggregate([
+  { $match: { isActive: true } },
+  {
+    $group: {
+      _id: "$category",
+      itemCount: { $sum: 1 },
+      totalValue: { $sum: { $multiply: ["$quantity", "$price"] } },
+      avgPrice: { $avg: "$price" }
+    }
+  },
+  { $sort: { totalValue: -1 } }
+]);
+
+// Monthly sales report
+db.orders.aggregate([
+  { $match: { status: "completed" } },
+  {
+    $group: {
+      _id: {
+        year: { $year: "$createdAt" },
+        month: { $month: "$createdAt" }
+      },
+      orderCount: { $sum: 1 },
+      totalRevenue: { $sum: "$total" },
+      avgOrderValue: { $avg: "$total" }
+    }
+  },
+  { $sort: { "_id.year": -1, "_id.month": -1 } }
+]);
+
+// Top selling products
+db.orders.aggregate([
+  { $match: { status: "completed" } },
+  { $unwind: "$items" },
+  {
+    $group: {
+      _id: "$items.productName",
+      totalSold: { $sum: "$items.quantity" },
+      totalRevenue: { $sum: "$items.totalPrice" }
+    }
+  },
+  { $sort: { totalSold: -1 } },
+  { $limit: 10 }
+]);
+
+// Customer analysis
+db.orders.aggregate([
+  { $match: { status: "completed" } },
+  {
+    $group: {
+      _id: "$customer.email",
+      customerName: { $first: "$customer.name" },
+      orderCount: { $sum: 1 },
+      totalSpent: { $sum: "$total" },
+      avgOrderValue: { $avg: "$total" },
+      lastOrderDate: { $max: "$createdAt" }
+    }
+  },
+  { $sort: { totalSpent: -1 } }
+]);
+
+// Daily sales trends (last 30 days)
+db.orders.aggregate([
+  {
+    $match: {
+      status: "completed",
+      createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
+    }
+  },
+  {
+    $group: {
+      _id: {
+        $dateToString: { format: "%Y-%m-%d", date: "$createdAt" }
+      },
+      orderCount: { $sum: 1 },
+      dailyRevenue: { $sum: "$total" },
+      avgOrderValue: { $avg: "$total" }
+    }
+  },
+  { $sort: { _id: -1 } }
+]);
+
+// Low stock alert
+db.inventory.find({
+  $expr: { $lte: ["$quantity", "$minStockLevel"] },
+  isActive: true
+}).sort({ quantity: 1 });
+
+// Category performance with product details
+db.orders.aggregate([
+  { $match: { status: "completed" } },
+  { $unwind: "$items" },
+  {
+    $lookup: {
+      from: "inventory",
+      localField: "items.inventoryId",
+      foreignField: "_id",
+      as: "product"
+    }
+  },
+  { $unwind: "$product" },
+  {
+    $group: {
+      _id: "$product.category",
+      productsSold: { $addToSet: "$items.productName" },
+      totalQuantitySold: { $sum: "$items.quantity" },
+      categoryRevenue: { $sum: "$items.totalPrice" },
+      avgSellingPrice: { $avg: "$items.unitPrice" }
+    }
+  },
+  {
+    $project: {
+      category: "$_id",
+      productsCount: { $size: "$productsSold" },
+      totalQuantitySold: 1,
+      categoryRevenue: 1,
+      avgSellingPrice: 1
+    }
+  },
+  { $sort: { categoryRevenue: -1 } }
+]);
+
+================================================================================
+## 3. ADVANCED ANALYTICS QUERIES
+================================================================================
+
+### SQL Analytics
+
+-- Sales forecasting (moving average)
+WITH monthly_sales AS (
+  SELECT 
+    DATE_TRUNC('month', created_at) as month,
+    SUM(total) as revenue
+  FROM orders 
+  WHERE status = 'completed'
+  GROUP BY DATE_TRUNC('month', created_at)
+)
+SELECT 
+  month,
+  revenue,
+  AVG(revenue) OVER (
+    ORDER BY month 
+    ROWS BETWEEN 2 PRECEDING AND CURRENT ROW
+  ) as moving_avg_3_month
+FROM monthly_sales
+ORDER BY month;
+
+-- ABC Analysis (Pareto Analysis) for inventory
+WITH product_revenue AS (
+  SELECT 
+    i.id,
+    i.name,
+    SUM(oi.total_price) as revenue
+  FROM inventory i
+  JOIN order_items oi ON i.id = oi.inventory_id
+  JOIN orders o ON oi.order_id = o.id
+  WHERE o.status = 'completed'
+  GROUP BY i.id, i.name
+),
+total_revenue AS (
+  SELECT SUM(revenue) as total FROM product_revenue
+),
+cumulative_revenue AS (
+  SELECT 
+    *,
+    SUM(revenue) OVER (ORDER BY revenue DESC) as cumulative_revenue,
+    (SELECT total FROM total_revenue) as total_revenue
+  FROM product_revenue
+)
+SELECT 
+  id,
+  name,
+  revenue,
+  ROUND((cumulative_revenue / total_revenue * 100), 2) as cumulative_percentage,
+  CASE 
+    WHEN cumulative_revenue / total_revenue <= 0.8 THEN 'A'
+    WHEN cumulative_revenue / total_revenue <= 0.95 THEN 'B'
+    ELSE 'C'
+  END as abc_category
+FROM cumulative_revenue
+ORDER BY revenue DESC;
+
+-- Seasonal analysis
+SELECT 
+  EXTRACT(MONTH FROM created_at) as month,
+  EXTRACT(YEAR FROM created_at) as year,
+  COUNT(*) as order_count,
+  SUM(total) as revenue,
+  AVG(total) as avg_order_value
+FROM orders
+WHERE status = 'completed'
+GROUP BY EXTRACT(YEAR FROM created_at), EXTRACT(MONTH FROM created_at)
+ORDER BY year, month;
+
+-- Customer retention analysis
+WITH customer_orders AS (
+  SELECT 
+    customer_email,
+    DATE_TRUNC('month', created_at) as order_month,
+    COUNT(*) as orders_count
+  FROM orders
+  WHERE status = 'completed'
+  GROUP BY customer_email, DATE_TRUNC('month', created_at)
+),
+customer_months AS (
+  SELECT 
+    customer_email,
+    order_month,
+    LAG(order_month) OVER (PARTITION BY customer_email ORDER BY order_month) as prev_month
+  FROM customer_orders
+)
+SELECT 
+  order_month,
+  COUNT(DISTINCT customer_email) as total_customers,
+  COUNT(DISTINCT CASE WHEN prev_month = order_month - INTERVAL '1 month' 
+                      THEN customer_email END) as retained_customers,
+  ROUND(
+    COUNT(DISTINCT CASE WHEN prev_month = order_month - INTERVAL '1 month' 
+                        THEN customer_email END) * 100.0 / 
+    COUNT(DISTINCT customer_email), 2
+  ) as retention_rate
+FROM customer_months
+GROUP BY order_month
+ORDER BY order_month;
+
+### MongoDB Analytics
+
+// Sales forecasting aggregation
+db.orders.aggregate([
+  { $match: { status: "completed" } },
+  {
+    $group: {
+      _id: {
+        year: { $year: "$createdAt" },
+        month: { $month: "$createdAt" }
+      },
+      revenue: { $sum: "$total" }
+    }
+  },
+  { $sort: { "_id.year": 1, "_id.month": 1 } },
+  {
+    $setWindowFields: {
+      sortBy: { "_id.year": 1, "_id.month": 1 },
+      output: {
+        movingAvg3Month: {
+          $avg: "$revenue",
+          window: { range: [-2, 0], unit: "position" }
+        }
+      }
+    }
+  }
+]);
+
+// Product performance with trend analysis
+db.orders.aggregate([
+  { $match: { status: "completed" } },
+  { $unwind: "$items" },
+  {
+    $group: {
+      _id: {
+        product: "$items.productName",
+        month: {
+          $dateToString: { format: "%Y-%m", date: "$createdAt" }
+        }
+      },
+      monthlySales: { $sum: "$items.quantity" },
+      monthlyRevenue: { $sum: "$items.totalPrice" }
+    }
+  },
+  {
+    $group: {
+      _id: "$_id.product",
+      salesData: {
+        $push: {
+          month: "$_id.month",
+          sales: "$monthlySales",
+          revenue: "$monthlyRevenue"
+        }
+      },
+      totalSales: { $sum: "$monthlySales" },
+      totalRevenue: { $sum: "$monthlyRevenue" }
+    }
+  },
+  { $sort: { totalRevenue: -1 } }
+]);
+
+// Customer segmentation (RFM Analysis)
+db.orders.aggregate([
+  { $match: { status: "completed" } },
+  {
+    $group: {
+      _id: "$customer.email",
+      customerName: { $first: "$customer.name" },
+      recency: { $max: "$createdAt" },
+      frequency: { $sum: 1 },
+      monetary: { $sum: "$total" }
+    }
+  },
+  {
+    $addFields: {
+      daysSinceLastOrder: {
+        $divide: [
+          { $subtract: [new Date(), "$recency"] },
+          1000 * 60 * 60 * 24
+        ]
+      }
+    }
+  },
+  {
+    $addFields: {
+      recencyScore: {
+        $switch: {
+          branches: [
+            { case: { $lte: ["$daysSinceLastOrder", 30] }, then: 5 },
+            { case: { $lte: ["$daysSinceLastOrder", 60] }, then: 4 },
+            { case: { $lte: ["$daysSinceLastOrder", 90] }, then: 3 },
+            { case: { $lte: ["$daysSinceLastOrder", 180] }, then: 2 }
+          ],
+          default: 1
+        }
+      },
+      frequencyScore: {
+        $switch: {
+          branches: [
+            { case: { $gte: ["$frequency", 10] }, then: 5 },
+            { case: { $gte: ["$frequency", 5] }, then: 4 },
+            { case: { $gte: ["$frequency", 3] }, then: 3 },
+            { case: { $gte: ["$frequency", 2] }, then: 2 }
+          ],
+          default: 1
+        }
+      },
+      monetaryScore: {
+        $switch: {
+          branches: [
+            { case: { $gte: ["$monetary", 5000] }, then: 5 },
+            { case: { $gte: ["$monetary", 2000] }, then: 4 },
+            { case: { $gte: ["$monetary", 1000] }, then: 3 },
+            { case: { $gte: ["$monetary", 500] }, then: 2 }
+          ],
+          default: 1
+        }
+      }
+    }
+  },
+  {
+    $addFields: {
+      customerSegment: {
+        $switch: {
+          branches: [
+            {
+              case: {
+                $and: [
+                  { $gte: ["$recencyScore", 4] },
+                  { $gte: ["$frequencyScore", 4] },
+                  { $gte: ["$monetaryScore", 4] }
+                ]
+              },
+              then: "Champions"
+            },
+            {
+              case: {
+                $and: [
+                  { $gte: ["$recencyScore", 3] },
+                  { $gte: ["$frequencyScore", 3] },
+                  { $gte: ["$monetaryScore", 3] }
+                ]
+              },
+              then: "Loyal Customers"
+            },
+            {
+              case: {
+                $and: [
+                  { $gte: ["$recencyScore", 4] },
+                  { $lte: ["$frequencyScore", 2] }
+                ]
+              },
+              then: "New Customers"
+            },
+            {
+              case: {
+                $and: [
+                  { $lte: ["$recencyScore", 2] },
+                  { $gte: ["$frequencyScore", 3] }
+                ]
+              },
+              then: "At Risk"
+            }
+          ],
+          default: "Others"
+        }
+      }
+    }
+  },
+  {
+    $group: {
+      _id: "$customerSegment",
+      customerCount: { $sum: 1 },
+      avgRecency: { $avg: "$daysSinceLastOrder" },
+      avgFrequency: { $avg: "$frequency" },
+      avgMonetary: { $avg: "$monetary" }
+    }
+  }
+]);
+
+================================================================================
+## 4. PERFORMANCE OPTIMIZATION QUERIES
+================================================================================
+
+### SQL Indexes
+
+-- Create indexes for better performance
+CREATE INDEX idx_inventory_category ON inventory(category_id);
+CREATE INDEX idx_inventory_sku ON inventory(sku);
+CREATE INDEX idx_inventory_name ON inventory(name);
+CREATE INDEX idx_orders_status ON orders(status);
+CREATE INDEX idx_orders_created_at ON orders(created_at);
+CREATE INDEX idx_orders_customer_email ON orders(customer_email);
+CREATE INDEX idx_order_items_order_id ON order_items(order_id);
+CREATE INDEX idx_order_items_inventory_id ON order_items(inventory_id);
+
+-- Composite indexes
+CREATE INDEX idx_inventory_category_status ON inventory(category_id, quantity);
+CREATE INDEX idx_orders_status_date ON orders(status, created_at);
+
+-- Partial indexes (PostgreSQL)
+CREATE INDEX idx_active_inventory ON inventory(name) WHERE is_active = true;
+CREATE INDEX idx_completed_orders ON orders(created_at) WHERE status = 'completed';
+
+### MongoDB Indexes
+
+// Create indexes for better performance
+db.inventory.createIndex({ "category": 1 });
+db.inventory.createIndex({ "sku": 1 }, { unique: true });
+db.inventory.createIndex({ "name": "text" });
+db.inventory.createIndex({ "isActive": 1, "quantity": 1 });
+
+db.orders.createIndex({ "status": 1 });
+db.orders.createIndex({ "createdAt": -1 });
+db.orders.createIndex({ "customer.email": 1 });
+db.orders.createIndex({ "status": 1, "createdAt": -1 });
+
+// Compound indexes
+db.inventory.createIndex({ "category": 1, "price": 1 });
+db.orders.createIndex({ "status": 1, "customer.email": 1 });
+
+// Text indexes for search
+db.inventory.createIndex({ 
+  "name": "text", 
+  "description": "text" 
+});
+
+// Partial indexes
+db.inventory.createIndex(
+  { "name": 1 },
+  { partialFilterExpression: { "isActive": true } }
+);
+
+### Query Optimization Tips
+
+-- SQL Query Optimization
+-- Use EXPLAIN ANALYZE to check query performance
+EXPLAIN ANALYZE SELECT * FROM inventory WHERE category_id = 1;
+
+-- Use LIMIT for pagination
+SELECT * FROM orders ORDER BY created_at DESC LIMIT 10 OFFSET 20;
+
+-- Use EXISTS instead of IN for subqueries
+SELECT * FROM inventory i 
+WHERE EXISTS (
+  SELECT 1 FROM order_items oi WHERE oi.inventory_id = i.id
+);
+
+-- Use window functions instead of subqueries
+SELECT 
+  name,
+  price,
+  ROW_NUMBER() OVER (PARTITION BY category_id ORDER BY price DESC) as price_rank
+FROM inventory;
+
+// MongoDB Query Optimization
+// Use explain() to analyze query performance
+db.inventory.find({ category: "Electronics" }).explain("executionStats");
+
+// Use projection to limit returned fields
+db.inventory.find(
+  { category: "Electronics" },
+  { name: 1, price: 1, quantity: 1 }
+);
+
+// Use limit and skip for pagination
+db.orders.find().sort({ createdAt: -1 }).limit(10).skip(20);
+
+// Use aggregation pipeline optimization
+db.orders.aggregate([
+  { $match: { status: "completed" } }, // Filter early
+  { $project: { total: 1, createdAt: 1 } }, // Project only needed fields
+  { $group: { _id: null, totalRevenue: { $sum: "$total" } } }
+]);
+
+================================================================================
+## 5. BACKUP AND MAINTENANCE QUERIES
+================================================================================
+
+### SQL Maintenance
+
+-- Database backup (PostgreSQL)
+pg_dump -h localhost -U username -d inventory_db > backup.sql
+
+-- Vacuum and analyze tables (PostgreSQL)
+VACUUM ANALYZE inventory;
+VACUUM ANALYZE orders;
+VACUUM ANALYZE order_items;
+
+-- Check table sizes
+SELECT 
+  schemaname,
+  tablename,
+  attname,
+  n_distinct,
+  correlation
+FROM pg_stats
+WHERE tablename IN ('inventory', 'orders', 'order_items');
+
+-- Archive old orders (older than 1 year)
+CREATE TABLE orders_archive AS 
+SELECT * FROM orders 
+WHERE created_at < CURRENT_DATE - INTERVAL '1 year';
+
+DELETE FROM orders 
+WHERE created_at < CURRENT_DATE - INTERVAL '1 year';
+
+### MongoDB Maintenance
+
+// Database backup
+mongodump --db inventory_db --out /backup/path
+
+// Check collection stats
+db.inventory.stats();
+db.orders.stats();
+
+// Compact collections
+db.runCommand({ compact: "inventory" });
+db.runCommand({ compact: "orders" });
+
+// Archive old data
+db.orders.aggregate([
+  {
+    $match: {
+      createdAt: { $lt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) }
+    }
+  },
+  { $out: "orders_archive" }
+]);
+
+db.orders.deleteMany({
+  createdAt: { $lt: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) }
+});
+
+================================================================================
+## 6. SAMPLE DATA GENERATION QUERIES
+================================================================================
+
+### SQL Sample Data
+
+-- Insert sample categories
+INSERT INTO categories (name, description) VALUES
+('Electronics', 'Electronic devices and components'),
+('Clothing', 'Apparel and fashion items'),
+('Books', 'Books and educational materials'),
+('Home & Garden', 'Home improvement and gardening supplies'),
+('Sports & Outdoors', 'Sports equipment and outdoor gear');
+
+-- Insert sample inventory items
+INSERT INTO inventory (name, category_id, quantity, price, description, sku, min_stock_level) VALUES
+('Laptop Pro 16', 1, 15, 2499.99, 'Professional laptop with high performance', 'LAP-PRO-16-001', 5),
+('Wireless Headphones', 1, 50, 199.99, 'Noise-cancelling wireless headphones', 'AUD-HEAD-WL-001', 10),
+('Cotton T-Shirt', 2, 100, 29.99, 'Comfortable cotton t-shirt', 'CLO-TSH-COT-001', 20),
+('Programming Guide', 3, 25, 49.99, 'Complete programming reference', 'BOO-PRO-GUI-001', 5),
+('Garden Hose', 4, 30, 39.99, '50ft expandable garden hose', 'GAR-HOS-50F-001', 10);
+
+-- Generate sample orders
+INSERT INTO orders (customer_name, customer_email, status, total) VALUES
+('Alice Johnson', 'alice@example.com', 'completed', 2499.99),
+('Bob Smith', 'bob@example.com', 'pending', 229.98),
+('Carol Williams', 'carol@example.com', 'completed', 159.96),
+('David Brown', 'david@example.com', 'processing', 49.99),
+('Eve Davis', 'eve@example.com', 'completed', 39.99);
+
+### MongoDB Sample Data
+
+// Insert sample categories
+db.categories.insertMany([
+  {
+    name: "Electronics",
+    description: "Electronic devices and components",
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    name: "Clothing",
+    description: "Apparel and fashion items",
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    name: "Books",
+    description: "Books and educational materials",
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+]);
+
+// Insert sample inventory
+db.inventory.insertMany([
+  {
+    name: "Laptop Pro 16",
+    category: "Electronics",
+    quantity: 15,
+    price: 2499.99,
+    description: "Professional laptop with high performance",
+    sku: "LAP-PRO-16-001",
+    minStockLevel: 5,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    name: "Wireless Headphones",
+    category: "Electronics",
+    quantity: 50,
+    price: 199.99,
+    description: "Noise-cancelling wireless headphones",
+    sku: "AUD-HEAD-WL-001",
+    minStockLevel: 10,
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+]);
+
+// Insert sample orders
+db.orders.insertMany([
+  {
+    orderNumber: "ORD-000001",
+    customer: {
+      name: "Alice Johnson",
+      email: "alice@example.com",
+      phone: "+1234567890"
+    },
+    items: [
+      {
+        productName: "Laptop Pro 16",
+        quantity: 1,
+        unitPrice: 2499.99,
+        totalPrice: 2499.99
+      }
+    ],
+    status: "completed",
+    total: 2499.99,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  },
+  {
+    orderNumber: "ORD-000002",
+    customer: {
+      name: "Bob Smith",
+      email: "bob@example.com",
+      phone: "+1234567891"
+    },
+    items: [
+      {
+        productName: "Wireless Headphones",
+        quantity: 1,
+        unitPrice: 199.99,
+        totalPrice: 199.99
+      }
+    ],
+    status: "pending",
+    total: 199.99,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  }
+]);
+
+================================================================================
+END OF QUERIES DOCUMENTATION
+================================================================================
+
+This comprehensive collection includes:
+1. Complete database schemas for both SQL and NoSQL
+2. Basic CRUD operations
+3. Advanced analytics and reporting queries
+4. Performance optimization techniques
+5. Maintenance and backup procedures
+6. Sample data for testing
+
+Use these queries as templates and modify them according to your specific requirements and database setup.
