@@ -23,20 +23,63 @@ def create_env_file():
     else:
         print("ℹ️ .env file already exists")
 
+def initialize_database():
+    """Initialize the SQLite database"""
+    try:
+        print("📊 Initializing SQLite database...")
+        # Import here to avoid issues if dependencies aren't installed yet
+        from app import app
+        from database import init_database
+        
+        with app.app_context():
+            init_database(app)
+        
+        print("✅ Database initialized successfully!")
+        return True
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        return False
+
 def main():
-    print("🚀 Setting up Flask API...")
+    print("🚀 Setting up Flask Inventory Management API...")
     
     if install_requirements():
         create_env_file()
-        print("\n🎉 Setup complete!")
-        print("\nTo start the server, run:")
-        print("python app.py")
-        print("\nDefault login credentials:")
-        print("Username: admin")
-        print("Password: admin123")
-        print("\nAPI will be available at: http://localhost:5001")
+        
+        if initialize_database():
+            print("\n🎉 Setup complete!")
+            print("\n" + "="*50)
+            print("📋 SETUP SUMMARY")
+            print("="*50)
+            print("✅ Requirements installed")
+            print("✅ Environment file created")
+            print("✅ SQLite database initialized")
+            print("✅ Sample data loaded")
+            print("\n📖 HOW TO START:")
+            print("python app.py")
+            print("\n🔑 DEFAULT LOGIN CREDENTIALS:")
+            print("Username: admin")
+            print("Password: admin123")
+            print("\n👥 OTHER TEST USERS:")
+            print("manager1 / manager123")
+            print("staff1 / staff123")
+            print("\n🌐 API ENDPOINTS:")
+            print("API Base URL: http://localhost:5001")
+            print("Health Check: http://localhost:5001/api/health")
+            print("\n📊 DATABASE:")
+            print("Type: SQLite")
+            print("File: ./inventory.db")
+            print("Tables: users, categories, inventory, orders, order_items, audit_logs")
+            print("\n📁 SAMPLE DATA INCLUDED:")
+            print("- 3 users (admin, manager1, staff1)")
+            print("- 6 categories")
+            print("- 14 inventory items")
+            print("- 3 sample orders")
+            print("="*50)
+        else:
+            print("\n❌ Setup failed during database initialization!")
     else:
-        print("\n❌ Setup failed!")
+        print("\n❌ Setup failed during requirements installation!")
 
 if __name__ == '__main__':
     main()

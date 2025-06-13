@@ -1,10 +1,15 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, jwt_required, create_access_token, get_jwt_identity, get_jwt
-from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import timedelta, datetime
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
+from werkzeug.security import check_password_hash
+
+# Import database components
+from models import db, User, Category, Inventory, Order, OrderItem, AuditLog
+from database import init_database, get_system_stats
+from decimal import Decimal
 import json
 
 # Load environment variables
@@ -13,97 +18,58 @@ load_dotenv()
 app = Flask(__name__)
 
 # Configuration
-app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'your-secret-key-change-this')
-app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=1)
+app.config['SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'dev-secret-key')
+app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'dev-secret-key')
+app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
+
+# SQLite Database Configuration
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(basedir, "inventory.db")}'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize extensions
+CORS(app, 
+     origins=['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'], 
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization'],
+     supports_credentials=True)
 jwt = JWTManager(app)
-CORS(app, origins=[os.getenv('FRONTEND_URL', 'http://localhost:5173')])
+db.init_app(app)
 
-# Mock database - replace with actual database
-users_db = {
-    'admin': {
-        'id': 1,
-        'username': 'admin',
-        'email': 'admin@example.com',
-        'password': generate_password_hash('admin123'),
-        'role': 'admin',
-        'is_active': True,
-        'created_at': '2024-01-01T00:00:00Z',
-        'last_login': None
-    }
-}
+# Initialize database with sample data
+with app.app_context():
+    init_database(app)
 
-inventory_db = [
-    {'id': 1, 'name': 'Laptop XPS 15', 'category': 'Electronics', 'quantity': 25, 'price': 1299.99, 'description': 'High-performance laptop'},
-    {'id': 2, 'name': 'Wireless Mouse', 'category': 'Accessories', 'quantity': 50, 'price': 29.99, 'description': 'Ergonomic wireless mouse'},
-]
+def log_action(action, table_name=None, record_id=None, old_values=None, new_values=None):
+    """Log user actions for audit trail"""
+    try:
+        # Only try to get user ID if we're in a JWT context
+        current_user_id = None
+        try:
+            jwt_identity = get_jwt_identity()
+            if jwt_identity:
+                current_user_id = int(jwt_identity)
+        except:
+            # If we can't get JWT identity (like during login), that's ok
+            pass
+            
+        ip_address = request.remote_addr if request else None
+        
+        audit_log = AuditLog(
+            user_id=current_user_id,
+            action=action,
+            table_name=table_name,
+            record_id=record_id,
+            old_values=json.dumps(old_values) if old_values else None,
+            new_values=json.dumps(new_values) if new_values else None,
+            ip_address=ip_address
+        )
+        db.session.add(audit_log)
+        db.session.commit()
+    except Exception as e:
+        print(f"Error logging action: {e}")
 
-categories_db = [
-    {'id': 1, 'name': 'Electronics', 'products': 12, 'value': 5200, 'growth': 12, 'description': 'Electronic devices and components'},
-    {'id': 2, 'name': 'Accessories', 'products': 45, 'value': 8500, 'growth': -5, 'description': 'Computer and device accessories'},
-]
-
-orders_db = [
-    {'id': 1, 'customer_name': 'John Doe', 'items': [{'name': 'Laptop XPS 15', 'quantity': 1, 'price': 1299.99}], 'status': 'pending', 'total': 1299.99},
-]
-
-# System settings
-system_settings = {
-    'company_name': 'Inventory Management Co.',
-    'email_notifications': True,
-    'backup_frequency': 'daily',
-    'max_login_attempts': 3,
-    'session_timeout': 30
-}
-
-# Audit logs
-audit_logs = [
-    {
-        'id': 1,
-        'timestamp': '2024-01-01T12:00:00Z',
-        'user': 'admin',
-        'action': 'LOGIN',
-        'resource': 'User Session',
-        'ip_address': '127.0.0.1',
-        'details': 'User logged in successfully'
-    }
-]
-
-# Helper function to add audit log
-def add_audit_log(action, resource, details=None):
-    current_user = get_jwt_identity()
-    log_entry = {
-        'id': len(audit_logs) + 1,
-        'timestamp': datetime.utcnow().isoformat() + 'Z',
-        'user': current_user or 'System',
-        'action': action,
-        'resource': resource,
-        'ip_address': request.remote_addr or '127.0.0.1',
-        'details': details or f'{action} operation on {resource}'
-    }
-    audit_logs.append(log_entry)
-
-# Helper function to check admin role
-def admin_required(f):
-    def decorated_function(*args, **kwargs):
-        claims = get_jwt()
-        if claims.get('role') != 'admin':
-            return jsonify({'error': 'Admin access required'}), 403
-        return f(*args, **kwargs)
-    decorated_function.__name__ = f.__name__
-    return decorated_function
-
-# Error handlers
-@app.errorhandler(404)
-def not_found(error):
-    return jsonify({'error': 'Not found'}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({'error': 'Internal server error'}), 500
-
-# Authentication routes
+# Authentication Routes
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     try:
@@ -114,181 +80,371 @@ def login():
         if not username or not password:
             return jsonify({'error': 'Username and password required'}), 400
         
-        user = users_db.get(username)
-        if user and check_password_hash(user['password'], password):
+        user = User.query.filter_by(username=username, is_active=True).first()
+        
+        if user and user.check_password(password):
             # Update last login
-            users_db[username]['last_login'] = datetime.utcnow().isoformat() + 'Z'
+            user.last_login = datetime.utcnow()
+            db.session.commit()
             
-            access_token = create_access_token(
-                identity=username,
-                additional_claims={'role': user['role']}
-            )
+            access_token = create_access_token(identity=str(user.id))
             
-            add_audit_log('LOGIN', 'User Session', f'User {username} logged in')
+            # Log successful login
+            log_action('LOGIN', 'users', user.id)
             
             return jsonify({
                 'access_token': access_token,
                 'user': {
-                    'username': username,
-                    'role': user['role'],
-                    'email': user['email']
+                    'id': user.id,
+                    'username': user.username,
+                    'email': user.email,
+                    'role': user.role
                 }
-            }), 200
-        
-        add_audit_log('LOGIN_FAILED', 'User Session', f'Failed login attempt for {username}')
-        return jsonify({'error': 'Invalid credentials'}), 401
+            })
+        else:
+            return jsonify({'error': 'Invalid credentials'}), 401
+            
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/auth/verify', methods=['GET'])
+@app.route('/api/auth/me', methods=['GET'])
 @jwt_required()
-def verify_token():
-    current_user = get_jwt_identity()
-    user = users_db.get(current_user)
-    if user:
-        return jsonify({
-            'user': {
-                'username': current_user,
-                'role': user['role'],
-                'email': user['email']
-            }
-        }), 200
-    return jsonify({'error': 'User not found'}), 404
-
-# Inventory routes
-@app.route('/api/inventory', methods=['GET'])
-@jwt_required()
-def get_inventory():
+def get_current_user():
     try:
-        return jsonify({'inventory': inventory_db}), 200
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
+        
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+            
+        return jsonify({'user': user.to_dict()})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/inventory', methods=['POST'])
-@jwt_required()
-def add_inventory_item():
-    try:
-        data = request.get_json()
-        
-        # Validate required fields
-        required_fields = ['name', 'category', 'quantity', 'price']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'{field} is required'}), 400
-        
-        item = {
-            'id': len(inventory_db) + 1,
-            'name': data['name'],
-            'category': data['category'],
-            'quantity': int(data['quantity']),
-            'price': float(data['price']),
-            'description': data.get('description', ''),
-            'created_by': get_jwt_identity()
-        }
-        
-        inventory_db.append(item)
-        return jsonify({'message': 'Item added successfully', 'item': item}), 201
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/inventory/<int:item_id>', methods=['PUT'])
-@jwt_required()
-def update_inventory_item(item_id):
-    try:
-        data = request.get_json()
-        
-        for item in inventory_db:
-            if item['id'] == item_id:
-                item.update({
-                    'name': data.get('name', item['name']),
-                    'category': data.get('category', item['category']),
-                    'quantity': int(data.get('quantity', item['quantity'])),
-                    'price': float(data.get('price', item['price'])),
-                    'description': data.get('description', item['description'])
-                })
-                return jsonify({'message': 'Item updated successfully', 'item': item}), 200
-        
-        return jsonify({'error': 'Item not found'}), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/inventory/<int:item_id>', methods=['DELETE'])
-@jwt_required()
-def delete_inventory_item(item_id):
-    try:
-        global inventory_db
-        inventory_db = [item for item in inventory_db if item['id'] != item_id]
-        return jsonify({'message': 'Item deleted successfully'}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-# Categories routes
+# Category Routes
 @app.route('/api/categories', methods=['GET'])
 @jwt_required()
 def get_categories():
     try:
-        return jsonify({'categories': categories_db}), 200
+        categories = Category.query.all()
+        return jsonify({'categories': [cat.to_dict() for cat in categories]})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/categories', methods=['POST'])
 @jwt_required()
-def add_category():
+def create_category():
     try:
         data = request.get_json()
+        name = data.get('name')
+        description = data.get('description', '')
         
-        if 'name' not in data:
+        if not name:
             return jsonify({'error': 'Category name is required'}), 400
         
-        category = {
-            'id': len(categories_db) + 1,
-            'name': data['name'],
-            'description': data.get('description', ''),
-            'products': 0,
-            'value': 0,
-            'growth': 0,
-            'created_by': get_jwt_identity()
-        }
+        # Check if category already exists
+        existing = Category.query.filter_by(name=name).first()
+        if existing:
+            return jsonify({'error': 'Category already exists'}), 400
         
-        categories_db.append(category)
-        return jsonify({'message': 'Category added successfully', 'category': category}), 201
+        category = Category(name=name, description=description)
+        db.session.add(category)
+        db.session.commit()
+        
+        log_action('CREATE', 'categories', category.id, None, category.to_dict())
+        
+        return jsonify({'category': category.to_dict()}), 201
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/categories/<int:category_id>', methods=['PUT'])
 @jwt_required()
 def update_category(category_id):
     try:
+        category = Category.query.get_or_404(category_id)
+        old_values = category.to_dict()
+        
         data = request.get_json()
+        category.name = data.get('name', category.name)
+        category.description = data.get('description', category.description)
+        category.updated_at = datetime.utcnow()
         
-        for category in categories_db:
-            if category['id'] == category_id:
-                category.update({
-                    'name': data.get('name', category['name']),
-                    'description': data.get('description', category['description'])
-                })
-                return jsonify({'message': 'Category updated successfully', 'category': category}), 200
+        db.session.commit()
         
-        return jsonify({'error': 'Category not found'}), 404
+        log_action('UPDATE', 'categories', category.id, old_values, category.to_dict())
+        
+        return jsonify({'category': category.to_dict()})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/categories/<int:category_id>', methods=['DELETE'])
 @jwt_required()
 def delete_category(category_id):
     try:
-        global categories_db
-        categories_db = [cat for cat in categories_db if cat['id'] != category_id]
-        return jsonify({'message': 'Category deleted successfully'}), 200
+        category = Category.query.get_or_404(category_id)
+        old_values = category.to_dict()
+        
+        # Check if category has inventory items
+        if category.inventory_items:
+            return jsonify({'error': 'Cannot delete category with existing inventory items'}), 400
+        
+        db.session.delete(category)
+        db.session.commit()
+        
+        log_action('DELETE', 'categories', category_id, old_values, None)
+        
+        return jsonify({'message': 'Category deleted successfully'})
     except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
-# Orders routes
+# Inventory Routes
+@app.route('/api/inventory', methods=['GET'])
+@jwt_required()
+def get_inventory():
+    try:
+        # Get query parameters
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        search = request.args.get('search', '')
+        category_id = request.args.get('category_id', type=int)
+        status = request.args.get('status', '')
+        
+        # Build query
+        query = Inventory.query.filter_by(is_active=True)
+        
+        if search:
+            # Use like instead of contains for better SQLite compatibility
+            query = query.filter(Inventory.name.like(f'%{search}%'))
+        
+        if category_id:
+            query = query.filter_by(category_id=category_id)
+        
+        if status == 'low_stock':
+            query = query.filter(Inventory.quantity <= Inventory.min_stock_level)
+        elif status == 'out_of_stock':
+            query = query.filter_by(quantity=0)
+        
+        # Execute query with pagination - using different approach for SQLite
+        try:
+            inventory = query.order_by(Inventory.name).paginate(
+                page=page, per_page=per_page, error_out=False
+            )
+            
+            return jsonify({
+                'inventory': [item.to_dict() for item in inventory.items],
+                'pagination': {
+                    'page': page,
+                    'pages': inventory.pages,
+                    'per_page': per_page,
+                    'total': inventory.total,
+                    'has_next': inventory.has_next,
+                    'has_prev': inventory.has_prev
+                }
+            })
+        except Exception as paginate_error:
+            # Fallback: manual pagination for older SQLAlchemy versions
+            total = query.count()
+            items = query.order_by(Inventory.name).offset((page - 1) * per_page).limit(per_page).all()
+            
+            return jsonify({
+                'inventory': [item.to_dict() for item in items],
+                'pagination': {
+                    'page': page,
+                    'pages': (total + per_page - 1) // per_page,
+                    'per_page': per_page,
+                    'total': total,
+                    'has_next': page * per_page < total,
+                    'has_prev': page > 1
+                }
+            })
+            
+    except Exception as e:
+        print(f"Inventory GET error: {str(e)}")  # Debug logging
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/inventory', methods=['POST'])
+@jwt_required()
+def create_inventory():
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Validate required fields
+        required_fields = ['name', 'quantity', 'price']
+        for field in required_fields:
+            if field not in data or data[field] == '' or data[field] is None:
+                return jsonify({'error': f'{field} is required'}), 400
+        
+        # Validate data types
+        try:
+            quantity = int(data['quantity'])
+            price = float(data['price'])
+        except (ValueError, TypeError):
+            return jsonify({'error': 'Invalid quantity or price format'}), 400
+        
+        if quantity < 0:
+            return jsonify({'error': 'Quantity cannot be negative'}), 400
+        
+        if price < 0:
+            return jsonify({'error': 'Price cannot be negative'}), 400
+        
+        # Validate category if provided
+        category_id = data.get('category_id')
+        if category_id:
+            try:
+                category_id = int(category_id)
+                category = Category.query.get(category_id)
+                if not category:
+                    return jsonify({'error': 'Invalid category ID'}), 400
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid category ID format'}), 400
+        
+        # Check if SKU already exists
+        sku = data.get('sku')
+        if sku and Inventory.query.filter_by(sku=sku).first():
+            return jsonify({'error': 'SKU already exists'}), 400
+        
+        inventory = Inventory(
+            name=data['name'].strip(),
+            category_id=category_id,
+            quantity=quantity,
+            price=Decimal(str(price)),
+            description=data.get('description', '').strip(),
+            sku=sku.strip() if sku else None,
+            min_stock_level=data.get('min_stock_level', 5)
+        )
+        
+        db.session.add(inventory)
+        db.session.commit()
+        
+        log_action('CREATE', 'inventory', inventory.id, None, inventory.to_dict())
+        
+        return jsonify({'inventory': inventory.to_dict()}), 201
+    except Exception as e:
+        db.session.rollback()
+        print(f"Create inventory error: {str(e)}")  # Debug logging
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/inventory/<int:inventory_id>', methods=['PUT'])
+@jwt_required()
+def update_inventory(inventory_id):
+    try:
+        inventory = Inventory.query.get_or_404(inventory_id)
+        old_values = inventory.to_dict()
+        
+        data = request.get_json()
+        
+        # Check SKU uniqueness if being updated
+        new_sku = data.get('sku')
+        if new_sku and new_sku != inventory.sku:
+            existing = Inventory.query.filter_by(sku=new_sku).first()
+            if existing:
+                return jsonify({'error': 'SKU already exists'}), 400
+        
+        # Update fields
+        inventory.name = data.get('name', inventory.name)
+        inventory.category_id = data.get('category_id', inventory.category_id)
+        inventory.quantity = data.get('quantity', inventory.quantity)
+        inventory.price = Decimal(str(data.get('price', inventory.price)))
+        inventory.description = data.get('description', inventory.description)
+        inventory.sku = new_sku or inventory.sku
+        inventory.min_stock_level = data.get('min_stock_level', inventory.min_stock_level)
+        inventory.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action('UPDATE', 'inventory', inventory.id, old_values, inventory.to_dict())
+        
+        return jsonify({'inventory': inventory.to_dict()})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/inventory/<int:inventory_id>', methods=['DELETE'])
+@jwt_required()
+def delete_inventory(inventory_id):
+    try:
+        inventory = Inventory.query.get_or_404(inventory_id)
+        old_values = inventory.to_dict()
+        
+        # Soft delete by setting is_active to False
+        inventory.is_active = False
+        inventory.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action('DELETE', 'inventory', inventory.id, old_values, inventory.to_dict())
+        
+        return jsonify({'message': 'Inventory item deleted successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+# Debug endpoint to test what data is being sent
+@app.route('/api/debug/inventory', methods=['POST'])
+@jwt_required()
+def debug_inventory():
+    try:
+        data = request.get_json()
+        print(f"DEBUG - Received data: {data}")
+        print(f"DEBUG - Data type: {type(data)}")
+        if data:
+            for key, value in data.items():
+                print(f"DEBUG - {key}: {value} (type: {type(value)})")
+        
+        return jsonify({
+            'received_data': data,
+            'data_keys': list(data.keys()) if data else [],
+            'message': 'Debug successful'
+        })
+    except Exception as e:
+        print(f"DEBUG - Error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Test endpoint for CORS debugging
+@app.route('/api/test-cors', methods=['GET', 'POST'])
+def test_cors():
+    return jsonify({
+        'message': 'CORS test successful',
+        'method': request.method,
+        'origin': request.headers.get('Origin'),
+        'timestamp': datetime.utcnow().isoformat()
+    })
+
+# Order Routes
 @app.route('/api/orders', methods=['GET'])
 @jwt_required()
 def get_orders():
     try:
-        return jsonify({'orders': orders_db}), 200
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        status = request.args.get('status', '')
+        
+        query = Order.query
+        
+        if status:
+            query = query.filter_by(status=status)
+        
+        orders = query.order_by(Order.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        return jsonify({
+            'orders': [order.to_dict() for order in orders.items],
+            'pagination': {
+                'page': page,
+                'pages': orders.pages,
+                'per_page': per_page,
+                'total': orders.total,
+                'has_next': orders.has_next,
+                'has_prev': orders.has_prev
+            }
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -298,256 +454,211 @@ def create_order():
     try:
         data = request.get_json()
         
-        required_fields = ['items', 'customer_name']
+        # Validate required fields
+        required_fields = ['customer_name', 'items']
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'{field} is required'}), 400
         
-        order = {
-            'id': len(orders_db) + 1,
-            'customer_name': data['customer_name'],
-            'items': data['items'],
-            'status': 'pending',
-            'total': sum(item.get('price', 0) * item.get('quantity', 0) for item in data['items']),
-            'created_by': get_jwt_identity()
-        }
+        if not data['items']:
+            return jsonify({'error': 'Order must have at least one item'}), 400
         
-        orders_db.append(order)
-        return jsonify({'message': 'Order created successfully', 'order': order}), 201
+        # Calculate total and validate inventory
+        total = Decimal('0')
+        items_data = []
+        
+        for item in data['items']:
+            inventory = Inventory.query.get(item['inventory_id'])
+            if not inventory or not inventory.is_active:
+                return jsonify({'error': f'Invalid inventory item: {item["inventory_id"]}'}), 400
+            
+            if inventory.quantity < item['quantity']:
+                return jsonify({'error': f'Insufficient stock for {inventory.name}'}), 400
+            
+            unit_price = Decimal(str(item.get('price', inventory.price)))
+            quantity = item['quantity']
+            total_price = unit_price * quantity
+            total += total_price
+            
+            items_data.append({
+                'inventory_id': inventory.id,
+                'quantity': quantity,
+                'unit_price': unit_price,
+                'total_price': total_price
+            })
+        
+        # Create order
+        order = Order(
+            customer_name=data['customer_name'],
+            customer_email=data.get('customer_email'),
+            customer_phone=data.get('customer_phone'),
+            status=data.get('status', 'pending'),
+            total=total
+        )
+        
+        db.session.add(order)
+        db.session.flush()  # Get order ID
+        
+        # Create order items and update inventory
+        for item_data in items_data:
+            item_data['order_id'] = order.id
+            order_item = OrderItem(**item_data)
+            db.session.add(order_item)
+            
+            # Update inventory quantity
+            inventory = Inventory.query.get(item_data['inventory_id'])
+            inventory.quantity -= item_data['quantity']
+            inventory.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action('CREATE', 'orders', order.id, None, order.to_dict())
+        
+        return jsonify({'order': order.to_dict()}), 201
     except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/orders/<int:order_id>', methods=['PUT'])
+@jwt_required()
+def update_order(order_id):
+    try:
+        order = Order.query.get_or_404(order_id)
+        old_values = order.to_dict()
+        
+        data = request.get_json()
+        
+        # Update basic order info
+        order.customer_name = data.get('customer_name', order.customer_name)
+        order.customer_email = data.get('customer_email', order.customer_email)
+        order.customer_phone = data.get('customer_phone', order.customer_phone)
+        order.status = data.get('status', order.status)
+        order.updated_at = datetime.utcnow()
+        
+        db.session.commit()
+        
+        log_action('UPDATE', 'orders', order.id, old_values, order.to_dict())
+        
+        return jsonify({'order': order.to_dict()})
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 # Admin Routes
-@app.route('/api/admin/users', methods=['GET'])
-@jwt_required()
-@admin_required
-def get_users():
-    try:
-        users_list = []
-        for username, user_data in users_db.items():
-            users_list.append({
-                'id': user_data['id'],
-                'username': username,
-                'email': user_data['email'],
-                'role': user_data['role'],
-                'is_active': user_data['is_active'],
-                'created_at': user_data.get('created_at'),
-                'last_login': user_data.get('last_login')
-            })
-        
-        add_audit_log('READ', 'Users', 'Retrieved users list')
-        return jsonify({'users': users_list}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/users', methods=['POST'])
-@jwt_required()
-@admin_required
-def create_user():
-    try:
-        data = request.get_json()
-        
-        required_fields = ['username', 'email', 'password', 'role']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'{field} is required'}), 400
-        
-        username = data['username']
-        if username in users_db:
-            return jsonify({'error': 'Username already exists'}), 400
-        
-        user_id = max([user['id'] for user in users_db.values()]) + 1 if users_db else 1
-        
-        users_db[username] = {
-            'id': user_id,
-            'username': username,
-            'email': data['email'],
-            'password': generate_password_hash(data['password']),
-            'role': data['role'],
-            'is_active': True,
-            'created_at': datetime.utcnow().isoformat() + 'Z',
-            'last_login': None
-        }
-        
-        add_audit_log('CREATE', 'User', f'Created user {username}')
-        return jsonify({'message': 'User created successfully'}), 201
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/users/<int:user_id>', methods=['PUT'])
-@jwt_required()
-@admin_required
-def update_user(user_id):
-    try:
-        data = request.get_json()
-        
-        # Find user by ID
-        user_to_update = None
-        username_key = None
-        for username, user_data in users_db.items():
-            if user_data['id'] == user_id:
-                user_to_update = user_data
-                username_key = username
-                break
-        
-        if not user_to_update:
-            return jsonify({'error': 'User not found'}), 404
-        
-        # Update user data
-        if 'email' in data:
-            user_to_update['email'] = data['email']
-        if 'role' in data:
-            user_to_update['role'] = data['role']
-        if 'is_active' in data:
-            user_to_update['is_active'] = data['is_active']
-        if 'password' in data and data['password']:
-            user_to_update['password'] = generate_password_hash(data['password'])
-        
-        add_audit_log('UPDATE', 'User', f'Updated user {username_key}')
-        return jsonify({'message': 'User updated successfully'}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/users/<int:user_id>', methods=['DELETE'])
-@jwt_required()
-@admin_required
-def delete_user(user_id):
-    try:
-        current_user = get_jwt_identity()
-        
-        # Find user by ID
-        user_to_delete = None
-        username_key = None
-        for username, user_data in users_db.items():
-            if user_data['id'] == user_id:
-                user_to_delete = user_data
-                username_key = username
-                break
-        
-        if not user_to_delete:
-            return jsonify({'error': 'User not found'}), 404
-        
-        # Prevent self-deletion
-        if username_key == current_user:
-            return jsonify({'error': 'Cannot delete your own account'}), 400
-        
-        del users_db[username_key]
-        
-        add_audit_log('DELETE', 'User', f'Deleted user {username_key}')
-        return jsonify({'message': 'User deleted successfully'}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/api/admin/system-stats', methods=['GET'])
 @jwt_required()
-@admin_required
-def get_system_stats():
+def admin_system_stats():
     try:
-        stats = {
-            'total_users': len(users_db),
-            'active_users': len([u for u in users_db.values() if u['is_active']]),
-            'total_items': len(inventory_db),
-            'total_categories': len(categories_db),
-            'total_orders': len(orders_db),
-            'low_stock_items': len([item for item in inventory_db if item['quantity'] < 10]),
-            'server_uptime': '99.9%',
-            'storage_used': '2.4 GB',
-            'database_size': '1.2 GB'
-        }
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
         
-        add_audit_log('READ', 'System Stats', 'Retrieved system statistics')
-        return jsonify({'stats': stats}), 200
+        if user.role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+        
+        stats = get_system_stats()
+        return jsonify(stats)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/admin/settings', methods=['GET'])
+@app.route('/api/admin/users', methods=['GET'])
 @jwt_required()
-@admin_required
-def get_system_settings():
+def admin_get_users():
     try:
-        add_audit_log('READ', 'System Settings', 'Retrieved system settings')
-        return jsonify({'settings': system_settings}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/settings', methods=['PUT'])
-@jwt_required()
-@admin_required
-def update_system_settings():
-    try:
-        data = request.get_json()
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
         
-        # Update settings
-        for key, value in data.items():
-            if key in system_settings:
-                system_settings[key] = value
+        if user.role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
         
-        add_audit_log('UPDATE', 'System Settings', 'Updated system settings')
-        return jsonify({'message': 'Settings updated successfully', 'settings': system_settings}), 200
+        users = User.query.all()
+        return jsonify({'users': [u.to_dict() for u in users]})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/admin/audit-logs', methods=['GET'])
 @jwt_required()
-@admin_required
-def get_audit_logs():
+def admin_get_audit_logs():
     try:
-        # Return last 100 logs, sorted by timestamp (newest first)
-        sorted_logs = sorted(audit_logs, key=lambda x: x['timestamp'], reverse=True)[:100]
+        current_user_id = int(get_jwt_identity())
+        user = User.query.get(current_user_id)
         
-        add_audit_log('READ', 'Audit Logs', 'Retrieved audit logs')
-        return jsonify({'logs': sorted_logs}), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/admin/backup', methods=['POST'])
-@jwt_required()
-@admin_required
-def backup_database():
-    try:
-        # Create a backup of the current data
-        backup_data = {
-            'users': users_db,
-            'inventory': inventory_db,
-            'categories': categories_db,
-            'orders': orders_db,
-            'settings': system_settings,
-            'audit_logs': audit_logs,
-            'backup_timestamp': datetime.utcnow().isoformat() + 'Z'
-        }
+        if user.role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
         
-        # Save backup to file
-        backup_filename = f"backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
-        backup_path = os.path.join(os.path.dirname(__file__), 'backups', backup_filename)
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
         
-        # Create backups directory if it doesn't exist
-        os.makedirs(os.path.dirname(backup_path), exist_ok=True)
+        logs = AuditLog.query.order_by(AuditLog.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
         
-        with open(backup_path, 'w') as f:
-            json.dump(backup_data, f, indent=2)
-        
-        add_audit_log('CREATE', 'Database Backup', f'Created backup: {backup_filename}')
         return jsonify({
-            'message': 'Database backup created successfully',
-            'backup_file': backup_filename
-        }), 200
+            'logs': [log.to_dict() for log in logs.items],
+            'pagination': {
+                'page': page,
+                'pages': logs.pages,
+                'per_page': per_page,
+                'total': logs.total,
+                'has_next': logs.has_next,
+                'has_prev': logs.has_prev
+            }
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# Dashboard stats
-@app.route('/api/dashboard/stats', methods=['GET'])
+# Analytics Routes
+@app.route('/api/analytics/low-stock', methods=['GET'])
 @jwt_required()
-def get_dashboard_stats():
+def get_low_stock_items():
     try:
-        stats = {
-            'total_items': len(inventory_db),
-            'total_categories': len(categories_db),
-            'total_orders': len(orders_db),
-            'low_stock_items': len([item for item in inventory_db if item['quantity'] < 10])
-        }
-        return jsonify({'stats': stats}), 200
+        items = Inventory.query.filter(
+            Inventory.quantity <= Inventory.min_stock_level,
+            Inventory.is_active == True
+        ).all()
+        
+        return jsonify({'low_stock_items': [item.to_dict() for item in items]})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/analytics/inventory-value', methods=['GET'])
+@jwt_required()
+def get_inventory_value():
+    try:
+        # Total inventory value
+        total_value = db.session.query(
+            db.func.sum(Inventory.quantity * Inventory.price)
+        ).filter_by(is_active=True).scalar() or 0
+        
+        # Value by category
+        category_values = db.session.query(
+            Category.name,
+            db.func.sum(Inventory.quantity * Inventory.price).label('value')
+        ).join(Inventory).filter(Inventory.is_active == True).group_by(Category.id).all()
+        
+        return jsonify({
+            'total_value': float(total_value),
+            'category_breakdown': [
+                {'category': name, 'value': float(value or 0)} 
+                for name, value in category_values
+            ]
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Health check route
+@app.route('/api/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        'status': 'healthy',
+        'database': 'connected',
+        'timestamp': datetime.utcnow().isoformat()
+    })
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    print("🚀 Starting Flask Inventory Management API...")
+    print("📊 Database: SQLite (inventory.db)")
+    print("🔑 Default Admin Login: admin / admin123")
+    print("🌐 API URL: http://localhost:5001")
+    print("📚 API Documentation available at endpoints above")
+    
+    app.run(host='0.0.0.0', port=5001, debug=True)

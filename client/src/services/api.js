@@ -29,22 +29,32 @@ class ApiService {
   async request(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
     const config = {
+      method: 'GET',
       headers: this.getHeaders(),
       ...options,
     };
 
     try {
+      console.log(`Making ${config.method} request to: ${url}`); // Debug log
       const response = await fetch(url, config);
-      const data = await response.json();
-
+      
       if (!response.ok) {
+        console.error(`HTTP ${response.status} - ${response.statusText}`); // Debug log
         if (response.status === 401) {
           this.logout();
           window.location.href = '/login';
         }
-        throw new Error(data.error || 'API request failed');
+        
+        // Try to parse error response
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+        } catch (jsonError) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
       }
 
+      const data = await response.json();
       return data;
     } catch (error) {
       console.error('API Error:', error);
@@ -64,10 +74,18 @@ class ApiService {
     }
     
     return data;
+  }  async getCurrentUser() {
+    return this.request('/auth/me');
   }
 
   async verifyToken() {
-    return this.request('/auth/verify');
+    // Since /auth/verify doesn't exist, we'll use /auth/me to verify the token
+    try {
+      await this.getCurrentUser();
+      return { valid: true };
+    } catch (error) {
+      return { valid: false };
+    }
   }
 
   logout() {
@@ -128,17 +146,16 @@ class ApiService {
   async getOrders() {
     return this.request('/orders');
   }
-
   async createOrder(order) {
     return this.request('/orders', {
       method: 'POST',
       body: JSON.stringify(order),
     });
-  }
-
-  // Dashboard
-  async getDashboardStats() {
-    return this.request('/dashboard/stats');
+  }  async updateOrder(id, order) {
+    return this.request(`/orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(order),
+    });
   }
 
   // Admin endpoints
@@ -165,13 +182,12 @@ class ApiService {
       method: 'DELETE',
     });
   }
-
   async getSystemSettings() {
-    return this.request('/admin/settings');
+    return this.request('/admin/system-stats');
   }
 
   async updateSystemSettings(settings) {
-    return this.request('/admin/settings', {
+    return this.request('/admin/system-stats', {
       method: 'PUT',
       body: JSON.stringify(settings),
     });

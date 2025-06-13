@@ -6,15 +6,20 @@ const AuthContext = createContext(null);
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
   useEffect(() => {
     // Check if user is already authenticated
     const checkAuth = async () => {
       try {
         const token = localStorage.getItem("access_token");
         if (token) {
-          await ApiService.verifyToken();
-          setIsAuthenticated(true);
+          ApiService.setToken(token);
+          const result = await ApiService.verifyToken();
+          if (result.valid) {
+            setIsAuthenticated(true);
+          } else {
+            localStorage.removeItem("access_token");
+            setIsAuthenticated(false);
+          }
         }
       } catch (error) {
         // Token is invalid, remove it

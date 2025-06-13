@@ -1,0 +1,982 @@
+# TEST DATA FOR INVENTORY MANAGEMENT SYSTEM
+
+## Table of Contents
+1. User Test Data
+2. Category Test Data
+3. Inventory Test Data
+4. Order Test Data
+5. System Settings Test Data
+6. Audit Log Test Data
+7. Python Dictionary Format (for Flask backend)
+8. SQL INSERT Statements
+9. MongoDB Documents
+10. API Request Examples
+
+================================================================================
+## 1. USER TEST DATA
+================================================================================
+
+### Admin Users
+ID: 1
+Username: admin
+Email: admin@inventory.com
+Password: admin123 (hashed: $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhZ8J5ZQJZX9VkqZ9vXrN6)
+Role: admin
+Created: 2024-01-01T00:00:00Z
+Last Login: 2024-12-15T10:30:00Z
+
+ID: 2
+Username: superadmin
+Email: superadmin@inventory.com
+Password: super123 (hashed: $2b$12$kL9vF3nPqRwTxMdFGHAkCOYz6TtxMQJqhZ8J5ZQJZX9VkqZ9vXrN7)
+Role: admin
+Created: 2024-01-01T00:00:00Z
+Last Login: 2024-12-14T14:15:00Z
+
+### Regular Users
+ID: 3
+Username: manager1
+Email: manager1@inventory.com
+Password: manager123 (hashed: $2b$12$mN8wG4oQrSxUyNeHIJBkDPZ7UutyNKrLiA9K6ARKAR0WlrqA0YsO8)
+Role: user
+Created: 2024-01-15T09:00:00Z
+Last Login: 2024-12-15T08:45:00Z
+
+ID: 4
+Username: staff1
+Email: staff1@inventory.com
+Password: staff123 (hashed: $2b$12$oP9xH5pRsTyVzOfIJKClEQ8VvuzOLsMLjB0L7BSLBS1XmsrB1ZtP9)
+Role: user
+Created: 2024-02-01T10:30:00Z
+Last Login: 2024-12-14T16:20:00Z
+
+ID: 5
+Username: staff2
+Email: staff2@inventory.com
+Password: staff123 (hashed: $2b$12$qR0yI6qStUzWaPgJKLDmFR9WwvAMtNmKcC1M8CTMCT2YntsC2AuQ0)
+Role: user
+Created: 2024-02-15T11:15:00Z
+Last Login: 2024-12-15T07:30:00Z
+
+================================================================================
+## 2. CATEGORY TEST DATA
+================================================================================
+
+### Categories with Products and Growth Data
+ID: 1
+Name: Electronics
+Description: Electronic devices, computers, and tech accessories
+Products: 25
+Value: 45250.75
+Growth: 12.5%
+
+ID: 2
+Name: Office Supplies
+Description: Stationery, office equipment, and workplace essentials
+Products: 18
+Value: 8450.25
+Growth: -2.1%
+
+ID: 3
+Name: Furniture
+Description: Office and home furniture, chairs, desks, and storage
+Products: 12
+Value: 32100.00
+Growth: 8.7%
+
+ID: 4
+Name: Tools & Equipment
+Description: Hand tools, power tools, and maintenance equipment
+Products: 22
+Value: 18750.50
+Growth: 15.3%
+
+ID: 5
+Name: Books & Media
+Description: Books, educational materials, and digital media
+Products: 35
+Value: 5425.75
+Growth: -5.8%
+
+ID: 6
+Name: Health & Safety
+Description: Safety equipment, first aid supplies, and protective gear
+Products: 15
+Value: 12300.25
+Growth: 22.4%
+
+================================================================================
+## 3. INVENTORY TEST DATA
+================================================================================
+
+### Electronics Category
+ID: 1
+Name: MacBook Pro 16-inch M3
+Category: Electronics
+Quantity: 8
+Price: 2999.99
+Description: Latest MacBook Pro with M3 chip, 16GB RAM, 512GB SSD
+SKU: MBP-16-M3-512
+Min Stock: 3
+
+ID: 2
+Name: Dell XPS 15 Laptop
+Category: Electronics
+Quantity: 12
+Price: 1799.99
+Description: High-performance laptop with Intel i7, 16GB RAM, 1TB SSD
+SKU: DELL-XPS15-I7
+Min Stock: 5
+
+ID: 3
+Name: Sony WH-1000XM5 Headphones
+Category: Electronics
+Quantity: 25
+Price: 399.99
+Description: Wireless noise-canceling headphones with premium sound
+SKU: SONY-WH1000XM5
+Min Stock: 10
+
+ID: 4
+Name: iPad Pro 12.9-inch
+Category: Electronics
+Quantity: 15
+Price: 1099.99
+Description: iPad Pro with M2 chip, 128GB storage, Wi-Fi model
+SKU: IPAD-PRO-12-M2
+Min Stock: 5
+
+ID: 5
+Name: Samsung 27" 4K Monitor
+Category: Electronics
+Quantity: 20
+Price: 449.99
+Description: 27-inch 4K UHD monitor with USB-C connectivity
+SKU: SAM-27-4K-USC
+Min Stock: 8
+
+ID: 6
+Name: Logitech MX Master 3S Mouse
+Category: Electronics
+Quantity: 35
+Price: 99.99
+Description: Advanced wireless mouse with precision tracking
+SKU: LOG-MX3S-WL
+Min Stock: 15
+
+### Office Supplies Category
+ID: 7
+Name: HP LaserJet Pro Printer
+Category: Office Supplies
+Quantity: 6
+Price: 299.99
+Description: Compact laser printer with wireless connectivity
+SKU: HP-LJ-PRO-WL
+Min Stock: 3
+
+ID: 8
+Name: Stapler Heavy Duty
+Category: Office Supplies
+Quantity: 25
+Price: 24.99
+Description: Heavy-duty stapler for high-volume use
+SKU: STAPLER-HD-001
+Min Stock: 10
+
+ID: 9
+Name: A4 Copy Paper (500 sheets)
+Category: Office Supplies
+Quantity: 150
+Price: 8.99
+Description: Premium white copy paper, 80gsm weight
+SKU: PAPER-A4-500
+Min Stock: 50
+
+ID: 10
+Name: Pilot G2 Pens (12-pack)
+Category: Office Supplies
+Quantity: 75
+Price: 18.99
+Description: Smooth writing gel pens, assorted colors
+SKU: PILOT-G2-12PK
+Min Stock: 20
+
+### Furniture Category
+ID: 11
+Name: Ergonomic Office Chair
+Category: Furniture
+Quantity: 15
+Price: 299.99
+Description: Adjustable ergonomic chair with lumbar support
+SKU: CHAIR-ERG-001
+Min Stock: 5
+
+ID: 12
+Name: Standing Desk Converter
+Category: Furniture
+Quantity: 10
+Price: 199.99
+Description: Height-adjustable desk converter for standing work
+SKU: DESK-STAND-CNV
+Min Stock: 3
+
+ID: 13
+Name: 4-Drawer Filing Cabinet
+Category: Furniture
+Quantity: 8
+Price: 149.99
+Description: Lockable metal filing cabinet with full extension drawers
+SKU: FILE-CAB-4DR
+Min Stock: 2
+
+### Tools & Equipment Category
+ID: 14
+Name: Cordless Drill Kit
+Category: Tools & Equipment
+Quantity: 18
+Price: 89.99
+Description: 20V cordless drill with battery and charger
+SKU: DRILL-20V-KIT
+Min Stock: 5
+
+ID: 15
+Name: Digital Multimeter
+Category: Tools & Equipment
+Quantity: 12
+Price: 45.99
+Description: Professional digital multimeter with auto-ranging
+SKU: MULTIMETER-DIG
+Min Stock: 3
+
+ID: 16
+Name: Tool Box 20-inch
+Category: Tools & Equipment
+Quantity: 22
+Price: 29.99
+Description: Portable tool box with removable tray
+SKU: TOOLBOX-20IN
+Min Stock: 8
+
+### Books & Media Category
+ID: 17
+Name: Python Programming Guide
+Category: Books & Media
+Quantity: 30
+Price: 49.99
+Description: Comprehensive guide to Python programming
+SKU: BOOK-PY-GUIDE
+Min Stock: 10
+
+ID: 18
+Name: JavaScript Handbook
+Category: Books & Media
+Quantity: 25
+Price: 39.99
+Description: Modern JavaScript development handbook
+SKU: BOOK-JS-HAND
+Min Stock: 8
+
+ID: 19
+Name: Project Management Fundamentals
+Category: Books & Media
+Quantity: 20
+Price: 34.99
+Description: Essential project management principles and practices
+SKU: BOOK-PM-FUND
+Min Stock: 5
+
+### Health & Safety Category
+ID: 20
+Name: First Aid Kit Complete
+Category: Health & Safety
+Quantity: 40
+Price: 79.99
+Description: Comprehensive first aid kit for workplace use
+SKU: AID-KIT-COMP
+Min Stock: 15
+
+ID: 21
+Name: Safety Glasses (Pack of 10)
+Category: Health & Safety
+Quantity: 60
+Price: 24.99
+Description: ANSI-rated safety glasses with anti-fog coating
+SKU: SAFETY-GLASS-10
+Min Stock: 20
+
+ID: 22
+Name: Fire Extinguisher 5lb
+Category: Health & Safety
+Quantity: 12
+Price: 49.99
+Description: ABC dry chemical fire extinguisher
+SKU: FIRE-EXT-5LB
+Min Stock: 5
+
+================================================================================
+## 4. ORDER TEST DATA
+================================================================================
+
+### Completed Orders
+Order ID: 1
+Customer: John Smith
+Customer Email: john.smith@company.com
+Customer Phone: +1-555-0123
+Status: completed
+Total: $3,399.98
+Created: 2024-12-10T09:15:00Z
+Items:
+  - MacBook Pro 16-inch M3 (Qty: 1, Price: $2,999.99)
+  - Logitech MX Master 3S Mouse (Qty: 4, Price: $99.99 each)
+
+Order ID: 2
+Customer: Sarah Johnson
+Customer Email: sarah.johnson@techcorp.com
+Customer Phone: +1-555-0124
+Status: completed
+Total: $2,249.97
+Created: 2024-12-11T14:30:00Z
+Items:
+  - Dell XPS 15 Laptop (Qty: 1, Price: $1,799.99)
+  - Sony WH-1000XM5 Headphones (Qty: 1, Price: $399.99)
+  - A4 Copy Paper (Qty: 5, Price: $8.99 each)
+
+Order ID: 3
+Customer: Michael Davis
+Customer Email: m.davis@startup.io
+Customer Phone: +1-555-0125
+Status: completed
+Total: $1,799.96
+Created: 2024-12-12T11:45:00Z
+Items:
+  - iPad Pro 12.9-inch (Qty: 1, Price: $1,099.99)
+  - Ergonomic Office Chair (Qty: 1, Price: $299.99)
+  - Sony WH-1000XM5 Headphones (Qty: 1, Price: $399.99)
+
+### Pending Orders
+Order ID: 4
+Customer: Lisa Chen
+Customer Email: lisa.chen@agency.com
+Customer Phone: +1-555-0126
+Status: pending
+Total: $1,199.95
+Created: 2024-12-14T16:20:00Z
+Items:
+  - Samsung 27" 4K Monitor (Qty: 2, Price: $449.99 each)
+  - Ergonomic Office Chair (Qty: 1, Price: $299.99)
+
+Order ID: 5
+Customer: Robert Wilson
+Customer Email: robert.w@consulting.biz
+Customer Phone: +1-555-0127
+Status: pending
+Total: $724.93
+Created: 2024-12-15T08:10:00Z
+Items:
+  - Standing Desk Converter (Qty: 2, Price: $199.99 each)
+  - Cordless Drill Kit (Qty: 3, Price: $89.99 each)
+  - Python Programming Guide (Qty: 5, Price: $49.99 each)
+
+### Processing Orders
+Order ID: 6
+Customer: Emma Thompson
+Customer Email: emma.t@design.studio
+Customer Phone: +1-555-0128
+Status: processing
+Total: $964.94
+Created: 2024-12-13T13:55:00Z
+Items:
+  - MacBook Pro 16-inch M3 (Qty: 1, Price: $2,999.99) [Back-ordered]
+  - iPad Pro 12.9-inch (Qty: 1, Price: $1,099.99) [Back-ordered]
+  - First Aid Kit Complete (Qty: 10, Price: $79.99 each)
+
+### Cancelled Orders
+Order ID: 7
+Customer: David Brown
+Customer Email: david.brown@corp.com
+Customer Phone: +1-555-0129
+Status: cancelled
+Total: $599.97
+Created: 2024-12-09T10:30:00Z
+Cancelled: 2024-12-09T15:45:00Z
+Items:
+  - HP LaserJet Pro Printer (Qty: 2, Price: $299.99 each)
+
+================================================================================
+## 5. SYSTEM SETTINGS TEST DATA
+================================================================================
+
+### Company Configuration
+Company Name: "TechFlow Inventory Solutions"
+Company Address: "123 Business Ave, Suite 100, Tech City, TC 12345"
+Company Phone: "+1-555-INVENTORY"
+Company Email: "support@techflow-inventory.com"
+Tax ID: "12-3456789"
+Currency: "USD"
+Timezone: "America/New_York"
+
+### Email Settings
+SMTP Server: "smtp.gmail.com"
+SMTP Port: 587
+Email Username: "notifications@techflow-inventory.com"
+Email Password: "[ENCRYPTED]"
+From Email: "TechFlow Inventory <notifications@techflow-inventory.com>"
+Email Notifications: true
+Low Stock Alerts: true
+Order Notifications: true
+System Alerts: true
+
+### Security Settings
+Max Login Attempts: 3
+Account Lockout Duration: 30 (minutes)
+Session Timeout: 30 (minutes)
+Password Min Length: 8
+Require Uppercase: true
+Require Numbers: true
+Require Special Characters: true
+Two Factor Authentication: false
+
+### Backup Settings
+Backup Frequency: "daily"
+Backup Time: "02:00"
+Backup Retention Days: 30
+Auto Backup Enabled: true
+Backup Location: "/backups/inventory"
+
+### Inventory Settings
+Low Stock Threshold: 10
+Auto Reorder: false
+Default Category: "Miscellaneous"
+SKU Auto Generation: true
+SKU Prefix: "INV"
+Track Serial Numbers: false
+
+================================================================================
+## 6. AUDIT LOG TEST DATA
+================================================================================
+
+### Recent Audit Entries
+ID: 1
+Timestamp: 2024-12-15T10:30:15Z
+User: admin
+Action: LOGIN
+Resource: User Session
+IP Address: 192.168.1.100
+Details: Admin user logged in successfully
+
+ID: 2
+Timestamp: 2024-12-15T10:32:45Z
+User: admin
+Action: CREATE
+Resource: Inventory Item
+IP Address: 192.168.1.100
+Details: Created new item: Samsung 27" 4K Monitor
+
+ID: 3
+Timestamp: 2024-12-15T10:35:20Z
+User: admin
+Action: UPDATE
+Resource: System Settings
+IP Address: 192.168.1.100
+Details: Updated backup frequency to daily
+
+ID: 4
+Timestamp: 2024-12-15T08:45:30Z
+User: manager1
+Action: UPDATE
+Resource: Inventory Item
+IP Address: 192.168.1.105
+Details: Updated quantity for MacBook Pro 16-inch M3
+
+ID: 5
+Timestamp: 2024-12-15T09:15:10Z
+User: staff1
+Action: CREATE
+Resource: Order
+IP Address: 192.168.1.110
+Details: Created order #4 for Lisa Chen
+
+ID: 6
+Timestamp: 2024-12-14T16:20:45Z
+User: staff2
+Action: UPDATE
+Resource: Order
+IP Address: 192.168.1.115
+Details: Updated order #3 status to completed
+
+ID: 7
+Timestamp: 2024-12-14T14:15:30Z
+User: superadmin
+Action: CREATE
+Resource: User
+IP Address: 192.168.1.101
+Details: Created new user account: staff2
+
+ID: 8
+Timestamp: 2024-12-14T11:30:25Z
+User: admin
+Action: DELETE
+Resource: Category
+IP Address: 192.168.1.100
+Details: Deleted category: Outdated Items
+
+================================================================================
+## 7. PYTHON DICTIONARY FORMAT (for Flask backend)
+================================================================================
+
+```python
+# Users Database
+users_db = {
+    'admin': {
+        'id': 1,
+        'username': 'admin',
+        'email': 'admin@inventory.com',
+        'password': generate_password_hash('admin123'),
+        'role': 'admin',
+        'is_active': True,
+        'created_at': '2024-01-01T00:00:00Z',
+        'last_login': '2024-12-15T10:30:00Z'
+    },
+    'manager1': {
+        'id': 3,
+        'username': 'manager1',
+        'email': 'manager1@inventory.com',
+        'password': generate_password_hash('manager123'),
+        'role': 'user',
+        'is_active': True,
+        'created_at': '2024-01-15T09:00:00Z',
+        'last_login': '2024-12-15T08:45:00Z'
+    },
+    'staff1': {
+        'id': 4,
+        'username': 'staff1',
+        'email': 'staff1@inventory.com',
+        'password': generate_password_hash('staff123'),
+        'role': 'user',
+        'is_active': True,
+        'created_at': '2024-02-01T10:30:00Z',
+        'last_login': '2024-12-14T16:20:00Z'
+    }
+}
+
+# Categories Database
+categories_db = [
+    {
+        'id': 1,
+        'name': 'Electronics',
+        'description': 'Electronic devices, computers, and tech accessories',
+        'products': 25,
+        'value': 45250.75,
+        'growth': 12.5
+    },
+    {
+        'id': 2,
+        'name': 'Office Supplies',
+        'description': 'Stationery, office equipment, and workplace essentials',
+        'products': 18,
+        'value': 8450.25,
+        'growth': -2.1
+    },
+    {
+        'id': 3,
+        'name': 'Furniture',
+        'description': 'Office and home furniture, chairs, desks, and storage',
+        'products': 12,
+        'value': 32100.00,
+        'growth': 8.7
+    }
+]
+
+# Inventory Database
+inventory_db = [
+    {
+        'id': 1,
+        'name': 'MacBook Pro 16-inch M3',
+        'category': 'Electronics',
+        'quantity': 8,
+        'price': 2999.99,
+        'description': 'Latest MacBook Pro with M3 chip, 16GB RAM, 512GB SSD',
+        'sku': 'MBP-16-M3-512',
+        'min_stock_level': 3
+    },
+    {
+        'id': 2,
+        'name': 'Dell XPS 15 Laptop',
+        'category': 'Electronics',
+        'quantity': 12,
+        'price': 1799.99,
+        'description': 'High-performance laptop with Intel i7, 16GB RAM, 1TB SSD',
+        'sku': 'DELL-XPS15-I7',
+        'min_stock_level': 5
+    },
+    {
+        'id': 3,
+        'name': 'Sony WH-1000XM5 Headphones',
+        'category': 'Electronics',
+        'quantity': 25,
+        'price': 399.99,
+        'description': 'Wireless noise-canceling headphones with premium sound',
+        'sku': 'SONY-WH1000XM5',
+        'min_stock_level': 10
+    }
+]
+
+# Orders Database
+orders_db = [
+    {
+        'id': 1,
+        'customer_name': 'John Smith',
+        'customer_email': 'john.smith@company.com',
+        'customer_phone': '+1-555-0123',
+        'items': [
+            {
+                'id': 1,
+                'name': 'MacBook Pro 16-inch M3',
+                'quantity': 1,
+                'price': 2999.99
+            },
+            {
+                'id': 6,
+                'name': 'Logitech MX Master 3S Mouse',
+                'quantity': 4,
+                'price': 99.99
+            }
+        ],
+        'status': 'completed',
+        'total': 3399.98,
+        'created_at': '2024-12-10T09:15:00Z'
+    },
+    {
+        'id': 2,
+        'customer_name': 'Sarah Johnson',
+        'customer_email': 'sarah.johnson@techcorp.com',
+        'customer_phone': '+1-555-0124',
+        'items': [
+            {
+                'id': 2,
+                'name': 'Dell XPS 15 Laptop',
+                'quantity': 1,
+                'price': 1799.99
+            },
+            {
+                'id': 3,
+                'name': 'Sony WH-1000XM5 Headphones',
+                'quantity': 1,
+                'price': 399.99
+            }
+        ],
+        'status': 'completed',
+        'total': 2249.97,
+        'created_at': '2024-12-11T14:30:00Z'
+    }
+]
+```
+
+================================================================================
+## 8. SQL INSERT STATEMENTS
+================================================================================
+
+```sql
+-- Insert Users
+INSERT INTO users (id, username, email, password_hash, role, is_active, created_at, last_login) VALUES
+(1, 'admin', 'admin@inventory.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhZ8J5ZQJZX9VkqZ9vXrN6', 'admin', true, '2024-01-01 00:00:00', '2024-12-15 10:30:00'),
+(2, 'superadmin', 'superadmin@inventory.com', '$2b$12$kL9vF3nPqRwTxMdFGHAkCOYz6TtxMQJqhZ8J5ZQJZX9VkqZ9vXrN7', 'admin', true, '2024-01-01 00:00:00', '2024-12-14 14:15:00'),
+(3, 'manager1', 'manager1@inventory.com', '$2b$12$mN8wG4oQrSxUyNeHIJBkDPZ7UutyNKrLiA9K6ARKAR0WlrqA0YsO8', 'user', true, '2024-01-15 09:00:00', '2024-12-15 08:45:00'),
+(4, 'staff1', 'staff1@inventory.com', '$2b$12$oP9xH5pRsTyVzOfIJKClEQ8VvuzOLsMLjB0L7BSLBS1XmsrB1ZtP9', 'user', true, '2024-02-01 10:30:00', '2024-12-14 16:20:00'),
+(5, 'staff2', 'staff2@inventory.com', '$2b$12$qR0yI6qStUzWaPgJKLDmFR9WwvAMtNmKcC1M8CTMCT2YntsC2AuQ0', 'user', true, '2024-02-15 11:15:00', '2024-12-15 07:30:00');
+
+-- Insert Categories
+INSERT INTO categories (id, name, description, products, value, growth) VALUES
+(1, 'Electronics', 'Electronic devices, computers, and tech accessories', 25, 45250.75, 12.5),
+(2, 'Office Supplies', 'Stationery, office equipment, and workplace essentials', 18, 8450.25, -2.1),
+(3, 'Furniture', 'Office and home furniture, chairs, desks, and storage', 12, 32100.00, 8.7),
+(4, 'Tools & Equipment', 'Hand tools, power tools, and maintenance equipment', 22, 18750.50, 15.3),
+(5, 'Books & Media', 'Books, educational materials, and digital media', 35, 5425.75, -5.8),
+(6, 'Health & Safety', 'Safety equipment, first aid supplies, and protective gear', 15, 12300.25, 22.4);
+
+-- Insert Inventory Items
+INSERT INTO inventory (id, name, category_id, quantity, price, description, sku, min_stock_level) VALUES
+(1, 'MacBook Pro 16-inch M3', 1, 8, 2999.99, 'Latest MacBook Pro with M3 chip, 16GB RAM, 512GB SSD', 'MBP-16-M3-512', 3),
+(2, 'Dell XPS 15 Laptop', 1, 12, 1799.99, 'High-performance laptop with Intel i7, 16GB RAM, 1TB SSD', 'DELL-XPS15-I7', 5),
+(3, 'Sony WH-1000XM5 Headphones', 1, 25, 399.99, 'Wireless noise-canceling headphones with premium sound', 'SONY-WH1000XM5', 10),
+(4, 'iPad Pro 12.9-inch', 1, 15, 1099.99, 'iPad Pro with M2 chip, 128GB storage, Wi-Fi model', 'IPAD-PRO-12-M2', 5),
+(5, 'Samsung 27" 4K Monitor', 1, 20, 449.99, '27-inch 4K UHD monitor with USB-C connectivity', 'SAM-27-4K-USC', 8),
+(6, 'Logitech MX Master 3S Mouse', 1, 35, 99.99, 'Advanced wireless mouse with precision tracking', 'LOG-MX3S-WL', 15),
+(7, 'HP LaserJet Pro Printer', 2, 6, 299.99, 'Compact laser printer with wireless connectivity', 'HP-LJ-PRO-WL', 3),
+(8, 'Stapler Heavy Duty', 2, 25, 24.99, 'Heavy-duty stapler for high-volume use', 'STAPLER-HD-001', 10),
+(9, 'A4 Copy Paper (500 sheets)', 2, 150, 8.99, 'Premium white copy paper, 80gsm weight', 'PAPER-A4-500', 50),
+(10, 'Pilot G2 Pens (12-pack)', 2, 75, 18.99, 'Smooth writing gel pens, assorted colors', 'PILOT-G2-12PK', 20);
+
+-- Insert Orders
+INSERT INTO orders (id, customer_name, customer_email, customer_phone, status, total, created_at) VALUES
+(1, 'John Smith', 'john.smith@company.com', '+1-555-0123', 'completed', 3399.98, '2024-12-10 09:15:00'),
+(2, 'Sarah Johnson', 'sarah.johnson@techcorp.com', '+1-555-0124', 'completed', 2249.97, '2024-12-11 14:30:00'),
+(3, 'Michael Davis', 'm.davis@startup.io', '+1-555-0125', 'completed', 1799.96, '2024-12-12 11:45:00'),
+(4, 'Lisa Chen', 'lisa.chen@agency.com', '+1-555-0126', 'pending', 1199.95, '2024-12-14 16:20:00'),
+(5, 'Robert Wilson', 'robert.w@consulting.biz', '+1-555-0127', 'pending', 724.93, '2024-12-15 08:10:00');
+
+-- Insert Order Items
+INSERT INTO order_items (order_id, inventory_id, quantity, unit_price, total_price) VALUES
+(1, 1, 1, 2999.99, 2999.99),
+(1, 6, 4, 99.99, 399.96),
+(2, 2, 1, 1799.99, 1799.99),
+(2, 3, 1, 399.99, 399.99),
+(2, 9, 5, 8.99, 44.95),
+(3, 4, 1, 1099.99, 1099.99),
+(3, 11, 1, 299.99, 299.99),
+(3, 3, 1, 399.99, 399.99);
+```
+
+================================================================================
+## 9. MONGODB DOCUMENTS
+================================================================================
+
+```javascript
+// Users Collection
+db.users.insertMany([
+  {
+    "_id": ObjectId("659f8b1234567890abcdef01"),
+    "username": "admin",
+    "email": "admin@inventory.com",
+    "passwordHash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhZ8J5ZQJZX9VkqZ9vXrN6",
+    "role": "admin",
+    "isActive": true,
+    "createdAt": ISODate("2024-01-01T00:00:00Z"),
+    "lastLogin": ISODate("2024-12-15T10:30:00Z")
+  },
+  {
+    "_id": ObjectId("659f8b1234567890abcdef02"),
+    "username": "manager1",
+    "email": "manager1@inventory.com",
+    "passwordHash": "$2b$12$mN8wG4oQrSxUyNeHIJBkDPZ7UutyNKrLiA9K6ARKAR0WlrqA0YsO8",
+    "role": "user",
+    "isActive": true,
+    "createdAt": ISODate("2024-01-15T09:00:00Z"),
+    "lastLogin": ISODate("2024-12-15T08:45:00Z")
+  }
+]);
+
+// Categories Collection
+db.categories.insertMany([
+  {
+    "_id": ObjectId("659f8c1234567890abcdef01"),
+    "name": "Electronics",
+    "description": "Electronic devices, computers, and tech accessories",
+    "products": 25,
+    "value": 45250.75,
+    "growth": 12.5,
+    "createdAt": ISODate("2024-01-01T00:00:00Z"),
+    "updatedAt": ISODate("2024-12-15T00:00:00Z")
+  },
+  {
+    "_id": ObjectId("659f8c1234567890abcdef02"),
+    "name": "Office Supplies",
+    "description": "Stationery, office equipment, and workplace essentials",
+    "products": 18,
+    "value": 8450.25,
+    "growth": -2.1,
+    "createdAt": ISODate("2024-01-01T00:00:00Z"),
+    "updatedAt": ISODate("2024-12-15T00:00:00Z")
+  }
+]);
+
+// Inventory Collection
+db.inventory.insertMany([
+  {
+    "_id": ObjectId("659f8d1234567890abcdef01"),
+    "name": "MacBook Pro 16-inch M3",
+    "categoryId": ObjectId("659f8c1234567890abcdef01"),
+    "category": "Electronics",
+    "quantity": 8,
+    "price": 2999.99,
+    "description": "Latest MacBook Pro with M3 chip, 16GB RAM, 512GB SSD",
+    "sku": "MBP-16-M3-512",
+    "minStockLevel": 3,
+    "isActive": true,
+    "createdAt": ISODate("2024-01-01T00:00:00Z"),
+    "updatedAt": ISODate("2024-12-15T00:00:00Z")
+  },
+  {
+    "_id": ObjectId("659f8d1234567890abcdef02"),
+    "name": "Dell XPS 15 Laptop",
+    "categoryId": ObjectId("659f8c1234567890abcdef01"),
+    "category": "Electronics",
+    "quantity": 12,
+    "price": 1799.99,
+    "description": "High-performance laptop with Intel i7, 16GB RAM, 1TB SSD",
+    "sku": "DELL-XPS15-I7",
+    "minStockLevel": 5,
+    "isActive": true,
+    "createdAt": ISODate("2024-01-01T00:00:00Z"),
+    "updatedAt": ISODate("2024-12-15T00:00:00Z")
+  }
+]);
+
+// Orders Collection
+db.orders.insertMany([
+  {
+    "_id": ObjectId("659f8e1234567890abcdef01"),
+    "orderNumber": "ORD-000001",
+    "customer": {
+      "name": "John Smith",
+      "email": "john.smith@company.com",
+      "phone": "+1-555-0123"
+    },
+    "items": [
+      {
+        "inventoryId": ObjectId("659f8d1234567890abcdef01"),
+        "productName": "MacBook Pro 16-inch M3",
+        "quantity": 1,
+        "unitPrice": 2999.99,
+        "totalPrice": 2999.99
+      },
+      {
+        "inventoryId": ObjectId("659f8d1234567890abcdef06"),
+        "productName": "Logitech MX Master 3S Mouse",
+        "quantity": 4,
+        "unitPrice": 99.99,
+        "totalPrice": 399.96
+      }
+    ],
+    "status": "completed",
+    "total": 3399.95,
+    "createdAt": ISODate("2024-12-10T09:15:00Z"),
+    "updatedAt": ISODate("2024-12-10T15:30:00Z")
+  }
+]);
+```
+
+================================================================================
+## 10. API REQUEST EXAMPLES
+================================================================================
+
+### Authentication Requests
+
+```bash
+# Login Request
+curl -X POST http://localhost:5001/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "password": "admin123"
+  }'
+
+# Response:
+{
+  "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+  "user": {
+    "username": "admin",
+    "role": "admin",
+    "email": "admin@inventory.com"
+  }
+}
+```
+
+### Inventory Management Requests
+
+```bash
+# Get All Inventory
+curl -X GET http://localhost:5001/api/inventory \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Add New Inventory Item
+curl -X POST http://localhost:5001/api/inventory \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "New Wireless Keyboard",
+    "category": "Electronics",
+    "quantity": 50,
+    "price": 79.99,
+    "description": "Mechanical wireless keyboard with RGB lighting"
+  }'
+
+# Update Inventory Item
+curl -X PUT http://localhost:5001/api/inventory/1 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "MacBook Pro 16-inch M3 (Updated)",
+    "quantity": 10,
+    "price": 2899.99
+  }'
+```
+
+### Order Management Requests
+
+```bash
+# Create New Order
+curl -X POST http://localhost:5001/api/orders \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "customer_name": "Test Customer",
+    "items": [
+      {
+        "id": 1,
+        "name": "MacBook Pro 16-inch M3",
+        "quantity": 1,
+        "price": 2999.99
+      }
+    ]
+  }'
+
+# Get All Orders
+curl -X GET http://localhost:5001/api/orders \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+### Admin Requests
+
+```bash
+# Get System Stats (Admin Only)
+curl -X GET http://localhost:5001/api/admin/system-stats \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+
+# Create New User (Admin Only)
+curl -X POST http://localhost:5001/api/admin/users \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "newuser",
+    "email": "newuser@inventory.com",
+    "password": "newuser123",
+    "role": "user"
+  }'
+
+# Backup Database (Admin Only)
+curl -X POST http://localhost:5001/api/admin/backup \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+```
+
+================================================================================
+## USAGE INSTRUCTIONS
+================================================================================
+
+### For Testing Flask Backend:
+1. Copy the Python dictionary data into your app.py file
+2. Replace the existing mock data with the comprehensive test data
+3. Use the API request examples to test endpoints
+4. Import test users for authentication testing
+
+### For Testing Frontend:
+1. Use the provided user credentials to test login functionality
+2. Navigate through different categories and inventory items
+3. Test order creation with sample customer data
+4. Test admin dashboard with admin user accounts
+
+### For Database Setup:
+1. Use SQL INSERT statements for relational database setup
+2. Use MongoDB documents for NoSQL database setup
+3. Create indexes as needed for performance
+4. Set up proper foreign key relationships in SQL
+
+### Security Notes:
+- All passwords are hashed using bcrypt
+- Test tokens should be replaced in production
+- IP addresses are localhost examples
+- Email addresses are for testing only
+
+================================================================================
+END OF TEST DATA
+================================================================================

@@ -11,10 +11,9 @@ function Inventory() {
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [formData, setFormData] = useState({
+  const [isSubmitting, setIsSubmitting] = useState(false);  const [formData, setFormData] = useState({
     name: "",
-    category: "",
+    category_id: "",
     quantity: "",
     price: "",
     description: "",
@@ -60,13 +59,12 @@ function Inventory() {
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
-
   const handleAddEdit = (item = null) => {
     setEditingItem(item);
     setFormData(
       item || {
         name: "",
-        category: "",
+        category_id: "",
         quantity: "",
         price: "",
         description: "",
@@ -77,12 +75,11 @@ function Inventory() {
     // Fetch fresh categories when opening modal
     fetchCategories();
   };
-
   const handleModalSubmit = async (e) => {
     e.preventDefault();
     if (
       !formData.name.trim() ||
-      !formData.category.trim() ||
+      !formData.category_id ||
       !formData.quantity ||
       !formData.price
     ) {
@@ -105,7 +102,7 @@ function Inventory() {
       setEditingItem(null);
       setFormData({
         name: "",
-        category: "",
+        category_id: "",
         quantity: "",
         price: "",
         description: "",
@@ -292,23 +289,21 @@ function Inventory() {
                 required
                 disabled={isSubmitting}
               />
-            </div>
-
-            <div className="form-control">
+            </div>            <div className="form-control">
               <label className="label">
                 <span className="label-text">Category *</span>
               </label>
               <select
-                name="category"
+                name="category_id"
                 className="select select-bordered"
-                value={formData.category}
+                value={formData.category_id}
                 onChange={handleInputChange}
                 required
                 disabled={isSubmitting}
               >
                 <option value="">Select a category</option>
                 {categories.map((category) => (
-                  <option key={category.id} value={category.name}>
+                  <option key={category.id} value={category.id}>
                     {category.name}
                   </option>
                 ))}
