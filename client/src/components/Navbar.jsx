@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 
 function Navbar({ onMenuClick }) {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, userData, userRole } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -36,8 +36,16 @@ function Navbar({ onMenuClick }) {
         <button className="btn btn-ghost text-xl" onClick={() => navigate("/")}>
           Inventory Management
         </button>
-      </div>
-      <div className="flex-none gap-2">
+      </div>      <div className="flex-none gap-2">
+        <div className="flex items-center mr-2">
+          <span className={`badge ${
+            userRole === 'admin' ? 'badge-primary' : 
+            userRole === 'staff' ? 'badge-secondary' : 
+            'badge-accent'
+          }`}>
+            {userRole || 'guest'}
+          </span>
+        </div>
         <div className="dropdown dropdown-end">
           <label tabIndex={0} className="btn btn-ghost btn-circle avatar">
             <div className="w-10 rounded-full">
@@ -48,6 +56,9 @@ function Navbar({ onMenuClick }) {
             tabIndex={0}
             className="mt-3 z-[1] p-2 shadow menu menu-sm dropdown-content bg-base-100 rounded-box w-52"
           >
+            <li>
+              <a className="font-semibold">{userData?.username || 'User'}</a>
+            </li>
             <li>
               <a>Profile</a>
             </li>

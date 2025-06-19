@@ -3,6 +3,7 @@ const API_BASE_URL = 'http://localhost:5001/api';
 class ApiService {
   constructor() {
     this.token = localStorage.getItem('access_token');
+    console.log('ApiService initialized');
   }
 
   setToken(token) {
@@ -96,18 +97,29 @@ class ApiService {
   async getInventory() {
     return this.request('/inventory');
   }
-
   async addInventoryItem(item) {
+    // Make sure vendor data is properly processed
+    const formattedItem = {
+      ...item,
+      vendors: item.vendors ? item.vendors.filter(v => v.vendor_id && v.unit_price) : []
+    };
+    
     return this.request('/inventory', {
       method: 'POST',
-      body: JSON.stringify(item),
+      body: JSON.stringify(formattedItem),
     });
   }
 
   async updateInventoryItem(id, item) {
+    // Make sure vendor data is properly processed
+    const formattedItem = {
+      ...item,
+      vendors: item.vendors ? item.vendors.filter(v => v.vendor_id && v.unit_price) : []
+    };
+    
     return this.request(`/inventory/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(item),
+      body: JSON.stringify(formattedItem),
     });
   }
 
@@ -206,6 +218,79 @@ class ApiService {
       method: 'POST',
     });
   }
+
+  // Vendors
+  async getVendors() {
+    return this.request('/vendors');
+  }
+
+  async getVendor(id) {
+    return this.request(`/vendors/${id}`);
+  }
+
+  async createVendor(vendorData) {
+    return this.request('/vendors', {
+      method: 'POST',
+      body: JSON.stringify(vendorData),
+    });
+  }
+
+  async updateVendor(id, vendorData) {
+    return this.request(`/vendors/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(vendorData),
+    });
+  }
+
+  async deleteVendor(id) {
+    return this.request(`/vendors/${id}`, {
+      method: 'DELETE',
+    });
+  }  // Purchase Orders
+  async getPurchaseOrders() {
+    console.log("Fetching purchase orders...");
+    return this.request('/purchase-orders');
+  }
+
+  async getPurchaseOrder(id) {
+    return this.request(`/purchase-orders/${id}`);
+  }
+
+  async createPurchaseOrder(poData) {
+    return this.request('/purchase-orders', {
+      method: 'POST',
+      body: JSON.stringify(poData),
+    });
+  }
+
+  async updatePurchaseOrder(id, poData) {
+    return this.request(`/purchase-orders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(poData),
+    });
+  }
+
+  async updatePurchaseOrderStatus(id, statusData) {
+    return this.request(`/purchase-orders/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(statusData),
+    });
+  }
+
+  async deletePurchaseOrder(id) {
+    return this.request(`/purchase-orders/${id}`, {
+      method: 'DELETE',
+    });
+  }
+  async receivePurchaseOrder(id, receiveData) {
+    console.log("Receiving purchase order with data:", receiveData);
+    return this.request(`/purchase-orders/${id}/receive`, {
+      method: 'POST',
+      body: JSON.stringify(receiveData),
+    });
+  }
 }
 
-export default new ApiService();
+// Create a single instance and export it
+const apiService = new ApiService();
+export default apiService;

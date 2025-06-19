@@ -37,7 +37,9 @@ function InventoryTable({ onEdit, onRefresh }) {
   const getCategoryName = (categoryId) => {
     const category = categories.find(cat => cat.id === categoryId);
     return category ? category.name : 'Unknown';
-  };  const handleEdit = (item) => {
+  };
+  
+  const handleEdit = (item) => {
     console.log("Edit button clicked for item:", item); // Debug log
     console.log("onEdit function exists:", typeof onEdit); // Debug log
     if (onEdit && typeof onEdit === 'function') {
@@ -123,8 +125,7 @@ function InventoryTable({ onEdit, onRefresh }) {
               <th>Status</th>
               <th>Actions</th>
             </tr>
-          </thead>
-          <tbody>
+          </thead><tbody>
             {inventory.map((item) => (
               <tr key={item.id}>
                 <td>{item.name}</td>
@@ -147,7 +148,8 @@ function InventoryTable({ onEdit, onRefresh }) {
                       ? "Low Stock"
                       : "Out of Stock"}
                   </div>
-                </td>                <td>
+                </td>
+                <td>
                   <div className="join">
                     <button 
                       className="btn btn-sm join-item"

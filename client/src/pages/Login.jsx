@@ -12,7 +12,6 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!credentials.username || !credentials.password) {
@@ -28,7 +27,7 @@ function Login() {
         credentials.username,
         credentials.password
       );
-      login();
+      login(response.user);
       navigate("/");
     } catch (error) {
       setError(error.message || "Login failed");

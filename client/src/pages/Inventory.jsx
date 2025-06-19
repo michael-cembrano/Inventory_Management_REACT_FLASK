@@ -8,16 +8,21 @@ function Inventory() {
   const [isLoading, setIsLoading] = useState(true);
   const [inventory, setInventory] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [vendors, setVendors] = useState([]);
   const [error, setError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);  const [formData, setFormData] = useState({
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
     name: "",
     category_id: "",
     quantity: "",
     price: "",
     description: "",
+    vendors: [{ vendor_id: "", unit_price: "" }]
   });
+  const [isVendorModalOpen, setIsVendorModalOpen] = useState(false);
+  const [selectedVendors, setSelectedVendors] = useState([]);
 
   const fetchInventory = async () => {
     try {
@@ -40,9 +45,19 @@ function Inventory() {
     }
   };
 
+  const fetchVendors = async () => {
+    try {
+      const response = await ApiService.getVendors();
+      setVendors(response.vendors || []);
+    } catch (error) {
+      console.error("Failed to fetch vendors:", error);
+    }
+  };
+
   useEffect(() => {
     fetchInventory();
     fetchCategories();
+    fetchVendors();
     const timer = setTimeout(() => setIsLoading(false), 1000);
     return () => clearTimeout(timer);
   }, []);
@@ -59,22 +74,66 @@ function Inventory() {
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
+  const handleVendorChange = (index, field, value) => {
+    const updatedVendors = [...formData.vendors];
+    updatedVendors[index][field] = value;
+    setFormData({ ...formData, vendors: updatedVendors });
+  };
+
+  const addVendorRow = () => {
+    setFormData({
+      ...formData,
+      vendors: [...formData.vendors, { vendor_id: "", unit_price: "" }]
+    });
+  };
+
+  const removeVendorRow = (index) => {
+    if (formData.vendors.length > 1) {
+      const updatedVendors = formData.vendors.filter((_, i) => i !== index);
+      setFormData({ ...formData, vendors: updatedVendors });
+    }
+  };
+
   const handleAddEdit = (item = null) => {
     setEditingItem(item);
-    setFormData(
-      item || {
+    if (item) {
+      // Edit mode
+      const initialVendors = item.vendors && item.vendors.length > 0 
+        ? item.vendors.map(v => ({ 
+            vendor_id: v.vendor_id, 
+            unit_price: v.unit_price 
+          }))
+        : [{ vendor_id: "", unit_price: "" }];
+      
+      setFormData({
+        name: item.name,
+        category_id: item.category_id,
+        quantity: item.quantity,
+        price: item.price,
+        description: item.description || "",
+        vendors: initialVendors
+      });
+      setSelectedVendors(item.vendors || []);
+    } else {
+      // Add mode
+      setFormData({
         name: "",
         category_id: "",
         quantity: "",
         price: "",
         description: "",
-      }
-    );
+        vendors: [{ vendor_id: "", unit_price: "" }]
+      });
+      setSelectedVendors([]);
+    }
     setIsModalOpen(true);
     setError("");
-    // Fetch fresh categories when opening modal
+    // Fetch fresh categories and vendors when opening modal
     fetchCategories();
+    fetchVendors();
   };
+
   const handleModalSubmit = async (e) => {
     e.preventDefault();
     if (
@@ -87,14 +146,34 @@ function Inventory() {
       return;
     }
 
+    // Validate vendors if any are added
+    const validVendors = formData.vendors.filter(v => v.vendor_id && v.unit_price);
+    if (validVendors.length > 0) {
+      // Make sure each vendor has both ID and price
+      const invalidVendors = formData.vendors.filter(
+        v => (v.vendor_id && !v.unit_price) || (!v.vendor_id && v.unit_price)
+      );
+      if (invalidVendors.length > 0) {
+        setError("Each vendor must have both a vendor selected and a price");
+        return;
+      }
+    }
+
     try {
       setIsSubmitting(true);
       setError("");
 
+      // Add vendors data to the submission
+      const submissionData = {
+        ...formData,
+        // Only include vendors with both id and price
+        vendors: formData.vendors.filter(v => v.vendor_id && v.unit_price)
+      };
+
       if (editingItem) {
-        await ApiService.updateInventoryItem(editingItem.id, formData);
+        await ApiService.updateInventoryItem(editingItem.id, submissionData);
       } else {
-        await ApiService.addInventoryItem(formData);
+        await ApiService.addInventoryItem(submissionData);
       }
 
       await fetchInventory();
@@ -106,12 +185,19 @@ function Inventory() {
         quantity: "",
         price: "",
         description: "",
+        vendors: [{ vendor_id: "", unit_price: "" }]
       });
     } catch (error) {
       setError(error.message);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const openVendorModal = (item) => {
+    setEditingItem(item);
+    setSelectedVendors(item.vendors || []);
+    setIsVendorModalOpen(true);
   };
 
   if (isLoading) return <LoadingScreen />;
@@ -130,6 +216,9 @@ function Inventory() {
       {error && (
         <div className="alert alert-error mb-4">
           <span>{error}</span>
+          <button className="btn btn-sm btn-ghost" onClick={() => setError("")}>
+            Dismiss
+          </button>
         </div>
       )}
 
@@ -189,6 +278,12 @@ function Inventory() {
                     Edit
                   </button>
                   <button
+                    className="btn btn-sm btn-info"
+                    onClick={() => openVendorModal(item)}
+                  >
+                    Vendors
+                  </button>
+                  <button
                     className="btn btn-sm btn-error"
                     onClick={() => handleDelete(item.id)}
                   >
@@ -209,6 +304,7 @@ function Inventory() {
                 <th>Price</th>
                 <th>Stock</th>
                 <th>Status</th>
+                <th>Vendors</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -246,12 +342,23 @@ function Inventory() {
                     </span>
                   </td>
                   <td>
+                    <span className="badge">
+                      {item.vendors ? item.vendors.length : 0} vendors
+                    </span>
+                  </td>
+                  <td>
                     <div className="flex gap-2">
                       <button
                         className="btn btn-xs"
                         onClick={() => handleAddEdit(item)}
                       >
                         Edit
+                      </button>
+                      <button
+                        className="btn btn-xs btn-info"
+                        onClick={() => openVendorModal(item)}
+                      >
+                        Vendors
                       </button>
                       <button
                         className="btn btn-xs btn-error"
@@ -289,7 +396,9 @@ function Inventory() {
                 required
                 disabled={isSubmitting}
               />
-            </div>            <div className="form-control">
+            </div>
+            
+            <div className="form-control">
               <label className="label">
                 <span className="label-text">Category *</span>
               </label>
@@ -337,7 +446,7 @@ function Inventory() {
 
               <div className="form-control">
                 <label className="label">
-                  <span className="label-text">Price *</span>
+                  <span className="label-text">Default Price *</span>
                 </label>
                 <input
                   type="number"
@@ -368,6 +477,80 @@ function Inventory() {
               />
             </div>
 
+            <div className="form-control">
+              <label className="label">
+                <span className="label-text">Vendors</span>
+              </label>
+              
+              <div className="overflow-x-auto mb-4">
+                <table className="table w-full">
+                  <thead>
+                    <tr>
+                      <th>Vendor</th>
+                      <th>Price</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.vendors.map((vendorItem, index) => (
+                      <tr key={index}>
+                        <td>
+                          <select
+                            className="select select-bordered w-full"
+                            value={vendorItem.vendor_id}
+                            onChange={(e) => 
+                              handleVendorChange(index, 'vendor_id', e.target.value)
+                            }
+                            disabled={isSubmitting}
+                          >
+                            <option value="">Select Vendor</option>
+                            {vendors.map(vendor => (
+                              <option key={vendor.id} value={vendor.id}>
+                                {vendor.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td>
+                          <input
+                            type="number"
+                            className="input input-bordered w-full"
+                            value={vendorItem.unit_price}
+                            onChange={(e) => 
+                              handleVendorChange(index, 'unit_price', e.target.value)
+                            }
+                            min="0"
+                            step="0.01"
+                            placeholder="0.00"
+                            disabled={isSubmitting}
+                          />
+                        </td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-sm btn-error"
+                            onClick={() => removeVendorRow(index)}
+                            disabled={formData.vendors.length <= 1 || isSubmitting}
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              <button
+                type="button"
+                className="btn btn-sm btn-outline"
+                onClick={addVendorRow}
+                disabled={isSubmitting}
+              >
+                Add Vendor
+              </button>
+            </div>
+
             <div className="modal-action">
               <button
                 type="button"
@@ -388,8 +571,69 @@ function Inventory() {
           </form>
         </div>
         <div
-          className="modal-backdrop"
+          className="modal-backdrop bg-gray-900 bg-opacity-40 backdrop-blur-sm"
           onClick={() => !isSubmitting && setIsModalOpen(false)}
+        ></div>
+      </dialog>
+
+      {/* View Vendors Modal */}
+      <dialog className={`modal ${isVendorModalOpen ? "modal-open" : ""}`}>
+        <div className="modal-box">
+          <h3 className="font-bold text-lg mb-4">
+            Vendors for {editingItem?.name || "Item"}
+          </h3>
+          
+          {selectedVendors.length === 0 ? (
+            <div className="text-center py-4">
+              <p>No vendors associated with this item</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="table w-full">
+                <thead>
+                  <tr>
+                    <th>Vendor</th>
+                    <th>Price</th>
+                    <th>Contact</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedVendors.map((vendorItem, index) => {
+                    const vendor = vendors.find(v => v.id === parseInt(vendorItem.vendor_id));
+                    return (
+                      <tr key={index}>
+                        <td>{vendor?.name || 'Unknown'}</td>
+                        <td>${parseFloat(vendorItem.unit_price).toFixed(2)}</td>
+                        <td>{vendor?.phone || vendor?.email || '-'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+          
+          <div className="modal-action">
+            <button 
+              className="btn" 
+              onClick={() => setIsVendorModalOpen(false)}
+            >
+              Close
+            </button>
+            <button 
+              className="btn btn-primary" 
+              onClick={() => {
+                setIsVendorModalOpen(false);
+                handleAddEdit(editingItem);
+              }}
+            >
+              Edit Vendors
+            </button>
+          </div>
+        </div>
+        <div
+          className="modal-backdrop bg-gray-900 bg-opacity-40 backdrop-blur-sm"
+          onClick={() => setIsVendorModalOpen(false)}
         ></div>
       </dialog>
     </div>

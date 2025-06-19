@@ -1,6 +1,7 @@
-from models import db, User, Category, Inventory, Order, OrderItem
+from models import db, User, Category, Inventory, Order, OrderItem, Vendor, PurchaseOrder, PurchaseOrderItem, InventoryVendor
 from decimal import Decimal
 import json
+from datetime import datetime, timedelta
 
 def init_database(app):
     """Initialize the database with tables and sample data"""
@@ -36,7 +37,7 @@ def init_database(app):
         staff_user = User(
             username='staff1',
             email='staff1@inventory.com',
-            role='user'
+            role='staff'
         )
         staff_user.set_password('staff123')
         db.session.add(staff_user)
@@ -249,6 +250,153 @@ def init_database(app):
                 item_data['total_price'] = item_data['quantity'] * item_data['unit_price']
                 order_item = OrderItem(**item_data)
                 db.session.add(order_item)
+        
+        # Create sample vendors
+        vendors_data = [
+            {
+                'name': 'Tech Supplies Inc.',
+                'contact_person': 'David Johnson',
+                'email': 'david@techsupplies.com',
+                'phone': '+1-555-1234',
+                'address': '123 Tech Avenue, San Francisco, CA 94101'
+            },
+            {
+                'name': 'Office Essentials Ltd.',
+                'contact_person': 'Emily Rodriguez',
+                'email': 'emily@officeessentials.com',
+                'phone': '+1-555-5678',
+                'address': '456 Office Park, Chicago, IL 60601'
+            },
+            {
+                'name': 'Furniture Concepts',
+                'contact_person': 'Michael Wong',
+                'email': 'mwong@furnitureconcepts.com',
+                'phone': '+1-555-9012',
+                'address': '789 Designer Blvd, New York, NY 10001'
+            }
+        ]
+        
+        vendors = []
+        for vendor_data in vendors_data:
+            vendor = Vendor(**vendor_data)
+            vendors.append(vendor)
+            db.session.add(vendor)
+        
+        # Commit to get vendor IDs
+        db.session.commit()
+        
+        # Create inventory-vendor associations
+        inventory_vendor_data = [
+            # MacBook Pro vendors
+            {'inventory_id': inventory_items[0].id, 'vendor_id': vendors[0].id, 'unit_price': Decimal('2850.00'), 'is_preferred': True},
+            {'inventory_id': inventory_items[0].id, 'vendor_id': vendors[1].id, 'unit_price': Decimal('2899.99')},
+            
+            # Dell XPS vendors
+            {'inventory_id': inventory_items[1].id, 'vendor_id': vendors[0].id, 'unit_price': Decimal('1749.99'), 'is_preferred': True},
+            {'inventory_id': inventory_items[1].id, 'vendor_id': vendors[1].id, 'unit_price': Decimal('1799.99')},
+            
+            # Sony Headphones vendors
+            {'inventory_id': inventory_items[2].id, 'vendor_id': vendors[0].id, 'unit_price': Decimal('379.99'), 'is_preferred': True},
+            {'inventory_id': inventory_items[2].id, 'vendor_id': vendors[1].id, 'unit_price': Decimal('399.99')},
+            
+            # Office supplies
+            {'inventory_id': inventory_items[7].id, 'vendor_id': vendors[1].id, 'unit_price': Decimal('22.99'), 'is_preferred': True},
+            {'inventory_id': inventory_items[8].id, 'vendor_id': vendors[1].id, 'unit_price': Decimal('7.99'), 'is_preferred': True},
+            
+            # Furniture
+            {'inventory_id': inventory_items[9].id, 'vendor_id': vendors[2].id, 'unit_price': Decimal('289.99'), 'is_preferred': True},
+            {'inventory_id': inventory_items[10].id, 'vendor_id': vendors[2].id, 'unit_price': Decimal('189.99'), 'is_preferred': True},
+        ]
+        
+        for vendor_assoc_data in inventory_vendor_data:
+            inventory_vendor = InventoryVendor(**vendor_assoc_data)
+            db.session.add(inventory_vendor)
+        
+        db.session.commit()
+        
+        # Create sample purchase orders
+        purchase_orders_data = [
+            {
+                'vendor_id': vendors[0].id,
+                'reference_number': 'PO-2023-001',
+                'status': 'approved',
+                'notes': 'Restocking electronics inventory',
+                'created_by': admin_user.id,
+                'expected_delivery_date': datetime.utcnow() + timedelta(days=7),
+                'items': [
+                    {
+                        'inventory_id': inventory_items[0].id,
+                        'quantity': 5,
+                        'unit_price': Decimal('2799.99'),
+                        'total_price': Decimal('13999.95')
+                    },
+                    {
+                        'inventory_id': inventory_items[2].id,
+                        'quantity': 10,
+                        'unit_price': Decimal('379.99'),
+                        'total_price': Decimal('3799.90')
+                    }
+                ]
+            },
+            {
+                'vendor_id': vendors[1].id,
+                'reference_number': 'PO-2023-002',
+                'status': 'submitted',
+                'notes': 'Office supplies for new hires',
+                'created_by': staff_user.id,
+                'expected_delivery_date': datetime.utcnow() + timedelta(days=5),
+                'items': [
+                    {
+                        'inventory_id': inventory_items[7].id,
+                        'quantity': 15,
+                        'unit_price': Decimal('22.99'),
+                        'total_price': Decimal('344.85')
+                    },
+                    {
+                        'inventory_id': inventory_items[8].id,
+                        'quantity': 50,
+                        'unit_price': Decimal('7.99'),
+                        'total_price': Decimal('399.50')
+                    }
+                ]
+            },
+            {
+                'vendor_id': vendors[2].id,
+                'reference_number': 'PO-2023-003',
+                'status': 'draft',
+                'notes': 'New furniture for conference room',
+                'created_by': admin_user.id,
+                'expected_delivery_date': datetime.utcnow() + timedelta(days=14),
+                'items': [
+                    {
+                        'inventory_id': inventory_items[9].id,
+                        'quantity': 8,
+                        'unit_price': Decimal('289.99'),
+                        'total_price': Decimal('2319.92')
+                    },
+                    {
+                        'inventory_id': inventory_items[10].id,
+                        'quantity': 4,
+                        'unit_price': Decimal('189.99'),
+                        'total_price': Decimal('759.96')
+                    }
+                ]
+            }
+        ]
+        
+        for po_data in purchase_orders_data:
+            items_data = po_data.pop('items')
+            po_total = sum(Decimal(str(item['total_price'])) for item in items_data)
+            po_data['total'] = po_total
+            
+            purchase_order = PurchaseOrder(**po_data)
+            db.session.add(purchase_order)
+            db.session.flush()  # Get PO ID
+            
+            for item_data in items_data:
+                item_data['purchase_order_id'] = purchase_order.id
+                po_item = PurchaseOrderItem(**item_data)
+                db.session.add(po_item)
         
         # Commit all changes
         db.session.commit()

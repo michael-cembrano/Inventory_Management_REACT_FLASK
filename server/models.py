@@ -72,8 +72,20 @@ class Inventory(db.Model):
     
     # Relationships
     order_items = db.relationship('OrderItem', backref='inventory_ref', lazy=True)
+    vendors = db.relationship('Vendor', secondary='inventory_vendors', 
+                             backref=db.backref('inventory_items', lazy='dynamic'),
+                             viewonly=True)
     
     def to_dict(self):
+        vendors_data = []
+        for vendor_assoc in self.vendor_associations:
+            vendors_data.append({
+                'vendor_id': vendor_assoc.vendor_id,
+                'vendor_name': vendor_assoc.vendor.name if vendor_assoc.vendor else 'Unknown',
+                'unit_price': float(vendor_assoc.unit_price),
+                'is_preferred': vendor_assoc.is_preferred
+            })
+            
         return {
             'id': self.id,
             'name': self.name,
@@ -87,7 +99,8 @@ class Inventory(db.Model):
             'is_active': self.is_active,
             'status': self.get_status(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'vendors': vendors_data
         }
     
     def get_status(self):
@@ -174,4 +187,125 @@ class AuditLog(db.Model):
             'new_values': self.new_values,
             'ip_address': self.ip_address,
             'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+class Vendor(db.Model):
+    __tablename__ = 'vendors'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(200), nullable=False)
+    contact_person = db.Column(db.String(100))
+    email = db.Column(db.String(255))
+    phone = db.Column(db.String(20))
+    address = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    purchase_orders = db.relationship('PurchaseOrder', backref='vendor', lazy=True)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'contact_person': self.contact_person,
+            'email': self.email,
+            'phone': self.phone,
+            'address': self.address,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class PurchaseOrder(db.Model):
+    __tablename__ = 'purchase_orders'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    vendor_id = db.Column(db.Integer, db.ForeignKey('vendors.id'), nullable=False)
+    reference_number = db.Column(db.String(50), unique=True)
+    status = db.Column(db.String(50), default='draft')  # draft, submitted, approved, received, canceled
+    total = db.Column(db.Numeric(10, 2), default=0.00)
+    notes = db.Column(db.Text)
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    expected_delivery_date = db.Column(db.DateTime)
+    received_date = db.Column(db.DateTime)
+    
+    # Relationships
+    po_items = db.relationship('PurchaseOrderItem', backref='purchase_order', lazy=True, cascade='all, delete-orphan')
+    creator = db.relationship('User', backref='created_purchase_orders', foreign_keys=[created_by])
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'vendor_id': self.vendor_id,
+            'vendor_name': self.vendor.name if self.vendor else None,
+            'reference_number': self.reference_number,
+            'status': self.status,
+            'total': float(self.total),
+            'notes': self.notes,
+            'created_by': self.created_by,
+            'creator_name': self.creator.username if self.creator else None,
+            'items': [item.to_dict() for item in self.po_items],
+            'item_count': len(self.po_items),
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'expected_delivery_date': self.expected_delivery_date.isoformat() if self.expected_delivery_date else None,
+            'received_date': self.received_date.isoformat() if self.received_date else None
+        }
+
+class PurchaseOrderItem(db.Model):
+    __tablename__ = 'purchase_order_items'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    purchase_order_id = db.Column(db.Integer, db.ForeignKey('purchase_orders.id'), nullable=False)
+    inventory_id = db.Column(db.Integer, db.ForeignKey('inventory.id'), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    total_price = db.Column(db.Numeric(10, 2), nullable=False)
+    received_quantity = db.Column(db.Integer, default=0)
+    
+    # Relationships
+    inventory = db.relationship('Inventory', backref='purchase_order_items')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'purchase_order_id': self.purchase_order_id,
+            'inventory_id': self.inventory_id,
+            'product_name': self.inventory.name if self.inventory else 'Unknown',
+            'quantity': self.quantity,
+            'unit_price': float(self.unit_price),
+            'total_price': float(self.total_price),
+            'received_quantity': self.received_quantity
+        }
+
+class InventoryVendor(db.Model):
+    """Association table for the many-to-many relationship between Inventory and Vendor"""
+    __tablename__ = 'inventory_vendors'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    inventory_id = db.Column(db.Integer, db.ForeignKey('inventory.id'), nullable=False)
+    vendor_id = db.Column(db.Integer, db.ForeignKey('vendors.id'), nullable=False)
+    unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    is_preferred = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    inventory = db.relationship('Inventory', backref=db.backref('vendor_associations', lazy='dynamic', cascade='all, delete-orphan'))
+    vendor = db.relationship('Vendor', backref=db.backref('inventory_associations', lazy='dynamic', cascade='all, delete-orphan'))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'inventory_id': self.inventory_id,
+            'vendor_id': self.vendor_id,
+            'vendor_name': self.vendor.name if self.vendor else 'Unknown',
+            'unit_price': float(self.unit_price),
+            'is_preferred': self.is_preferred,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
