@@ -63,6 +63,11 @@ class Inventory(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=True)
     quantity = db.Column(db.Integer, nullable=False, default=0)
     price = db.Column(db.Numeric(10, 2), nullable=False)
+    # New UOM fields
+    unit_of_measure = db.Column(db.String(20), nullable=False, default='pcs')  # pcs, kg, lbs, m, cm, etc.
+    price_per_uom = db.Column(db.Numeric(10, 4), nullable=False)  # Price per unit of measure
+    conversion_factor = db.Column(db.Numeric(10, 4), default=1)  # For converting between units
+    base_unit = db.Column(db.String(20), nullable=False, default='pcs')  # Base unit for calculations
     description = db.Column(db.Text)
     sku = db.Column(db.String(50), unique=True)
     min_stock_level = db.Column(db.Integer, default=5)
@@ -75,6 +80,31 @@ class Inventory(db.Model):
     vendors = db.relationship('Vendor', secondary='inventory_vendors', 
                              backref=db.backref('inventory_items', lazy='dynamic'),
                              viewonly=True)
+    
+    def calculate_total_price(self, quantity):
+        """Calculate total price based on quantity and price per UOM"""
+        return float(self.price_per_uom) * quantity
+    
+    def convert_quantity(self, quantity, from_unit, to_unit):
+        """Convert quantity from one unit to another"""
+        if from_unit == to_unit:
+            return quantity
+        
+        # Simple conversion logic - you can expand this based on your needs
+        conversion_rates = {
+            ('kg', 'g'): 1000,
+            ('g', 'kg'): 0.001,
+            ('m', 'cm'): 100,
+            ('cm', 'm'): 0.01,
+            ('lbs', 'kg'): 0.453592,
+            ('kg', 'lbs'): 2.20462,
+        }
+        
+        conversion_key = (from_unit, to_unit)
+        if conversion_key in conversion_rates:
+            return quantity * conversion_rates[conversion_key]
+        
+        return quantity  # No conversion available
     
     def to_dict(self):
         vendors_data = []
@@ -93,6 +123,11 @@ class Inventory(db.Model):
             'category': self.category_ref.name if self.category_ref else None,
             'quantity': self.quantity,
             'price': float(self.price),
+            'unit_of_measure': self.unit_of_measure,
+            'price_per_uom': float(self.price_per_uom),
+            'conversion_factor': float(self.conversion_factor) if self.conversion_factor else 1,
+            'base_unit': self.base_unit,
+            'total_value': self.calculate_total_price(self.quantity),
             'description': self.description,
             'sku': self.sku,
             'min_stock_level': self.min_stock_level,
@@ -151,6 +186,9 @@ class OrderItem(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
     total_price = db.Column(db.Numeric(10, 2), nullable=False)
+    # New UOM fields for order items
+    unit_of_measure = db.Column(db.String(20), nullable=False, default='pcs')
+    price_per_uom = db.Column(db.Numeric(10, 4), nullable=False)
     
     def to_dict(self):
         return {
@@ -160,7 +198,10 @@ class OrderItem(db.Model):
             'product_name': self.inventory_ref.name if self.inventory_ref else 'Unknown',
             'quantity': self.quantity,
             'unit_price': float(self.unit_price),
-            'total_price': float(self.total_price)
+            'total_price': float(self.total_price),
+            'unit_of_measure': self.unit_of_measure,
+            'price_per_uom': float(self.price_per_uom),
+            'formatted_quantity': f"{self.quantity} {self.unit_of_measure}"
         }
 
 class AuditLog(db.Model):
@@ -266,6 +307,9 @@ class PurchaseOrderItem(db.Model):
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
     total_price = db.Column(db.Numeric(10, 2), nullable=False)
     received_quantity = db.Column(db.Integer, default=0)
+    # New UOM fields for purchase order items
+    unit_of_measure = db.Column(db.String(20), nullable=False, default='pcs')
+    price_per_uom = db.Column(db.Numeric(10, 4), nullable=False)
     
     # Relationships
     inventory = db.relationship('Inventory', backref='purchase_order_items')
@@ -279,7 +323,10 @@ class PurchaseOrderItem(db.Model):
             'quantity': self.quantity,
             'unit_price': float(self.unit_price),
             'total_price': float(self.total_price),
-            'received_quantity': self.received_quantity
+            'received_quantity': self.received_quantity,
+            'unit_of_measure': self.unit_of_measure,
+            'price_per_uom': float(self.price_per_uom),
+            'formatted_quantity': f"{self.quantity} {self.unit_of_measure}"
         }
 
 class InventoryVendor(db.Model):

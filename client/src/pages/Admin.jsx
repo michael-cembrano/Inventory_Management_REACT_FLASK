@@ -27,21 +27,94 @@ function Admin() {
     session_timeout: 30,
   });
 
+  // Fetch admin data from backend endpoints
   const fetchAdminData = async () => {
     try {
       setIsLoading(true);
-      const [usersRes, statsRes, logsRes, settingsRes] = await Promise.all([
-        ApiService.getUsers().catch(() => ({ users: [] })),
-        ApiService.getSystemStats().catch(() => ({ stats: {} })),
-        ApiService.getAuditLogs().catch(() => ({ logs: [] })),
-        ApiService.getSystemSettings().catch(() => ({ settings: {} })),
-      ]);
+      setError("");
 
-      setUsers(usersRes.users || []);
-      setSystemStats(statsRes.stats || {});
-      setAuditLogs(logsRes.logs || []);
-      setSystemSettings({ ...systemSettings, ...(settingsRes.settings || {}) });
+      // Fetch users - this is the main fix
+      try {
+        console.log("Fetching users..."); // Debug log
+        const usersRes = await ApiService.getUsers();
+        console.log("Users response:", usersRes); // Debug log
+        setUsers(usersRes.users || []);
+      } catch (usersError) {
+        console.error("Error fetching users:", usersError);
+        setError(`Failed to fetch users: ${usersError.message}`);
+        setUsers([]); // Set empty array as fallback
+      }
+
+      // Fetch system stats
+      try {
+        const statsRes = await ApiService.getSystemStats();
+        setSystemStats(statsRes);
+      } catch (err) {
+        console.warn("Failed to fetch system stats, using fallback:", err);
+        // fallback to mock if endpoint not implemented
+        setSystemStats({
+          total_users: users.length || 0,
+          total_categories: 6,
+          total_products: 14,
+          total_orders: 3,
+          low_stock_items: 2,
+          inventory_value: 45000,
+        });
+      }
+
+      // Fetch audit logs
+      try {
+        const logsRes = await ApiService.getAuditLogs();
+        setAuditLogs(logsRes.logs || []);
+      } catch (err) {
+        console.warn("Failed to fetch audit logs, using fallback:", err);
+        // fallback to mock logs
+        setAuditLogs([
+          {
+            id: 1,
+            created_at: new Date().toISOString(),
+            user_id: 1,
+            action: "LOGIN",
+            table_name: "users",
+            record_id: "1",
+            ip_address: "192.168.1.100",
+            new_values: JSON.stringify({
+              username: "admin",
+              last_login: new Date().toISOString(),
+            }),
+          },
+          {
+            id: 2,
+            created_at: new Date(Date.now() - 3600000).toISOString(),
+            user_id: null,
+            action: "SYSTEM_INIT",
+            table_name: "system",
+            record_id: null,
+            ip_address: "127.0.0.1",
+            new_values: JSON.stringify({ status: "Database initialized" }),
+          },
+        ]);
+      }
+
+      // Fetch system settings
+      try {
+        const settingsRes = await ApiService.getSystemSettings();
+        setSystemSettings((prev) => ({ ...prev, ...settingsRes }));
+      } catch (err) {
+        console.warn("Failed to fetch system settings, using fallback:", err);
+        // fallback to localStorage or default
+        const savedSettings = localStorage.getItem("systemSettings");
+        if (savedSettings) {
+          try {
+            const parsed = JSON.parse(savedSettings);
+            setSystemSettings((prev) => ({ ...prev, ...parsed }));
+          } catch (error) {
+            // ignore
+          }
+        }
+      }
     } catch (error) {
+      console.error("General admin data fetch error:", error);
       setError(error.message);
     } finally {
       setIsLoading(false);
@@ -50,6 +123,7 @@ function Admin() {
 
   useEffect(() => {
     fetchAdminData();
+    // eslint-disable-next-line
   }, []);
 
   const handleUserSubmit = async (e) => {
@@ -80,33 +154,93 @@ function Admin() {
     }
   };
 
-  const handleDeleteUser = async (userId) => {
-    try {
-      await ApiService.deleteUser(userId);
-      await fetchAdminData();
-    } catch (error) {
-      setError(error.message);
+  const handleDeleteUser = async (userId, username) => {
+    if (
+      window.confirm(
+        `Are you sure you want to delete user "${username}"? This action cannot be undone.`
+      )
+    ) {
+      try {
+        setError("");
+        const response = await ApiService.deleteUser(userId);
+
+        // Show success message
+        if (response.message) {
+          alert(response.message);
+        }
+
+        await fetchAdminData();
+      } catch (error) {
+        console.error("Delete user error:", error);
+        setError(`Failed to delete user: ${error.message}`);
+      }
     }
   };
 
   const handleBackup = async () => {
     try {
-      await ApiService.backupDatabase();
-      alert("Database backup initiated successfully");
+      setError("");
+      // Since the backup endpoint doesn't exist yet, we'll simulate it
+      const confirmed = window.confirm(
+        "This will create a backup of the current database. Continue?"
+      );
+
+      if (!confirmed) return;
+
+      // Try to call the actual endpoint first
+      try {
+        await ApiService.backupDatabase();
+        alert("Database backup initiated successfully");
+      } catch (error) {
+        // If endpoint doesn't exist, show a helpful message
+        if (error.message.includes("404") || error.message.includes("CORS")) {
+          alert(
+            "Backup endpoint not yet implemented on the server. " +
+              "The backup feature will be available once the admin API endpoints are added to the Flask backend."
+          );
+        } else {
+          throw error;
+        }
+      }
     } catch (error) {
-      setError(error.message);
+      setError(`Backup failed: ${error.message}`);
     }
   };
 
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
     try {
+      setError("");
+
       await ApiService.updateSystemSettings(systemSettings);
       alert("Settings updated successfully");
     } catch (error) {
-      setError(error.message);
+      console.error("Settings update error:", error);
+      // If endpoint doesn't exist, show a helpful message and store locally
+      if (error.message.includes("404") || error.message.includes("CORS")) {
+        // Store settings in localStorage as fallback
+        localStorage.setItem("systemSettings", JSON.stringify(systemSettings));
+        alert(
+          "Settings saved locally. The system settings API endpoint will need to be implemented on the Flask backend for persistent storage."
+        );
+      } else {
+        setError(`Settings update failed: ${error.message}`);
+      }
     }
   };
+
+  // Load settings from localStorage on component mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem("systemSettings");
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings);
+        setSystemSettings({ ...systemSettings, ...parsed });
+      } catch (error) {
+        console.warn("Failed to parse saved settings:", error);
+      }
+    }
+  }, []);
 
   // Chart data
   const userActivityData = {
@@ -151,7 +285,12 @@ function Admin() {
             className="btn btn-primary"
             onClick={() => {
               setEditingUser(null);
-              setFormData({ username: "", email: "", role: "user", password: "" });
+              setFormData({
+                username: "",
+                email: "",
+                role: "user",
+                password: "",
+              });
               setIsModalOpen(true);
             }}
           >
@@ -205,23 +344,29 @@ function Admin() {
           <div className="stats shadow stats-vertical lg:stats-horizontal w-full">
             <div className="stat">
               <div className="stat-title">Total Users</div>
-              <div className="stat-value">{users.length}</div>
+              <div className="stat-value">
+                {systemStats.total_users || users.length}
+              </div>
               <div className="stat-desc">Active system users</div>
             </div>
             <div className="stat">
-              <div className="stat-title">Server Uptime</div>
-              <div className="stat-value">99.9%</div>
-              <div className="stat-desc">Last 30 days</div>
+              <div className="stat-title">Total Products</div>
+              <div className="stat-value">
+                {systemStats.total_products || 14}
+              </div>
+              <div className="stat-desc">In inventory</div>
             </div>
             <div className="stat">
-              <div className="stat-title">Storage Used</div>
-              <div className="stat-value">2.4 GB</div>
-              <div className="stat-desc">of 10 GB available</div>
+              <div className="stat-title">Total Orders</div>
+              <div className="stat-value">{systemStats.total_orders || 3}</div>
+              <div className="stat-desc">All time</div>
             </div>
             <div className="stat">
-              <div className="stat-title">Database Size</div>
-              <div className="stat-value">1.2 GB</div>
-              <div className="stat-desc">↗︎ Growing</div>
+              <div className="stat-title">Low Stock Items</div>
+              <div className="stat-value text-warning">
+                {systemStats.low_stock_items || 2}
+              </div>
+              <div className="stat-desc">Need attention</div>
             </div>
           </div>
 
@@ -265,11 +410,88 @@ function Admin() {
           <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
               <h3 className="card-title">Quick Actions</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                <button className="btn btn-outline">Export Data</button>
-                <button className="btn btn-outline">System Health</button>
-                <button className="btn btn-outline">Clear Cache</button>
-                <button className="btn btn-outline">Maintenance Mode</button>
+              <p className="text-sm text-base-content/70 mb-4">
+                Some features require additional backend implementation
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button
+                  className="btn btn-outline"
+                  onClick={() =>
+                    alert(
+                      "Export functionality will be implemented in a future update"
+                    )
+                  }
+                >
+                  Export Data
+                </button>
+                <button
+                  className="btn btn-outline"
+                  onClick={() =>
+                    alert(
+                      "System health monitoring will be implemented in a future update"
+                    )
+                  }
+                >
+                  System Health
+                </button>
+                <button
+                  className="btn btn-outline"
+                  onClick={() =>
+                    alert(
+                      "Cache management will be implemented in a future update"
+                    )
+                  }
+                >
+                  Clear Cache
+                </button>
+                <button
+                  className="btn btn-outline"
+                  onClick={() =>
+                    alert(
+                      "Maintenance mode will be implemented in a future update"
+                    )
+                  }
+                >
+                  Maintenance Mode
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Backend Implementation Notice */}
+          <div className="alert alert-info">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              className="stroke-current shrink-0 w-6 h-6"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            <div>
+              <h4 className="font-bold">Development Notice</h4>
+              <div className="text-sm">
+                Some admin features are using mock data. The following Flask
+                backend endpoints need to be implemented:
+                <ul className="list-disc list-inside mt-2 ml-4">
+                  <li>
+                    <code>/api/admin/stats</code> - System statistics
+                  </li>
+                  <li>
+                    <code>/api/admin/backup</code> - Database backup
+                  </li>
+                  <li>
+                    <code>/api/admin/settings</code> - System settings
+                  </li>
+                  <li>
+                    <code>/api/admin/logs</code> - Audit logs
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
@@ -298,7 +520,9 @@ function Admin() {
                   <td>
                     <span
                       className={`badge ${
-                        user.role === "admin" ? "badge-primary" : "badge-secondary"
+                        user.role === "admin"
+                          ? "badge-primary"
+                          : "badge-secondary"
                       }`}
                     >
                       {user.role}
@@ -328,7 +552,7 @@ function Admin() {
                       </button>
                       <button
                         className="btn btn-sm join-item btn-error"
-                        onClick={() => handleDeleteUser(user.id)}
+                        onClick={() => handleDeleteUser(user.id, user.username)}
                       >
                         Delete
                       </button>
@@ -346,6 +570,25 @@ function Admin() {
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             <h3 className="card-title">System Settings</h3>
+            <div className="alert alert-warning mb-4">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="stroke-current shrink-0 h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.728-.833-2.498 0L3.732 16c-.77.833.192 2.5 1.732 2.5z"
+                />
+              </svg>
+              <span>
+                Settings are currently stored locally. Server-side storage will
+                be implemented soon.
+              </span>
+            </div>
             <form onSubmit={handleSettingsSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="form-control">
@@ -367,7 +610,9 @@ function Admin() {
 
                 <div className="form-control">
                   <label className="label">
-                    <span className="label-text">Session Timeout (minutes)</span>
+                    <span className="label-text">
+                      Session Timeout (minutes)
+                    </span>
                   </label>
                   <input
                     type="number"
@@ -449,41 +694,146 @@ function Admin() {
 
       {/* Logs Tab */}
       {activeTab === "logs" && (
-        <div className="overflow-x-auto">
-          <table className="table table-zebra">
-            <thead>
-              <tr>
-                <th>Timestamp</th>
-                <th>User</th>
-                <th>Action</th>
-                <th>Resource</th>
-                <th>IP Address</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditLogs.map((log, index) => (
-                <tr key={index}>
-                  <td>{log.timestamp || new Date().toLocaleString()}</td>
-                  <td>{log.user || "System"}</td>
-                  <td>
-                    <span
-                      className={`badge ${
-                        log.action === "DELETE"
-                          ? "badge-error"
-                          : log.action === "CREATE"
-                          ? "badge-success"
-                          : "badge-info"
-                      }`}
-                    >
-                      {log.action || "LOGIN"}
-                    </span>
-                  </td>
-                  <td>{log.resource || "User Session"}</td>
-                  <td>{log.ip_address || "127.0.0.1"}</td>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-lg font-semibold">Audit Logs</h3>
+            <div className="flex gap-2">
+              <select className="select select-bordered select-sm">
+                <option value="">All Actions</option>
+                <option value="LOGIN">Login</option>
+                <option value="CREATE">Create</option>
+                <option value="UPDATE">Update</option>
+                <option value="DELETE">Delete</option>
+                <option value="SYSTEM_INIT">System Init</option>
+              </select>
+              <button className="btn btn-sm btn-outline">Export</button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="table table-zebra">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Table</th>
+                  <th>Record ID</th>
+                  <th>IP Address</th>
+                  <th>Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {auditLogs.length > 0 ? (
+                  auditLogs.map((log, index) => (
+                    <tr key={log.id || index}>
+                      <td className="text-sm">
+                        {log.created_at
+                          ? new Date(log.created_at).toLocaleString()
+                          : new Date().toLocaleString()}
+                      </td>
+                      <td>
+                        <div className="flex items-center gap-2">
+                          <div className="avatar placeholder">
+                            <div className="bg-neutral text-neutral-content rounded-full w-8">
+                              <span className="text-xs">
+                                {log.user_id ? "U" : "S"}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-sm">
+                            {log.user_id ? `User ${log.user_id}` : "System"}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <span
+                          className={`badge badge-sm ${
+                            log.action === "DELETE" || log.action === "ERROR"
+                              ? "badge-error"
+                              : log.action === "CREATE" ||
+                                log.action === "SYSTEM_INIT"
+                              ? "badge-success"
+                              : log.action === "UPDATE"
+                              ? "badge-warning"
+                              : log.action === "LOGIN"
+                              ? "badge-info"
+                              : "badge-neutral"
+                          }`}
+                        >
+                          {log.action || "LOGIN"}
+                        </span>
+                      </td>
+                      <td className="text-sm">{log.table_name || "session"}</td>
+                      <td className="text-sm">{log.record_id || "-"}</td>
+                      <td className="text-sm">
+                        {log.ip_address || "127.0.0.1"}
+                      </td>
+                      <td>
+                        {(log.new_values || log.old_values) && (
+                          <details className="dropdown">
+                            <summary className="btn btn-xs btn-ghost">
+                              View
+                            </summary>
+                            <div className="dropdown-content card card-compact w-96 p-2 shadow bg-base-100 z-10">
+                              <div className="card-body">
+                                <h4 className="card-title text-sm">Details</h4>
+                                {log.new_values && (
+                                  <div className="text-xs">
+                                    <strong>New Values:</strong>
+                                    <pre className="whitespace-pre-wrap bg-base-200 p-2 rounded mt-1">
+                                      {typeof log.new_values === "string"
+                                        ? log.new_values
+                                        : JSON.stringify(
+                                            JSON.parse(log.new_values),
+                                            null,
+                                            2
+                                          )}
+                                    </pre>
+                                  </div>
+                                )}
+                                {log.old_values && (
+                                  <div className="text-xs">
+                                    <strong>Old Values:</strong>
+                                    <pre className="whitespace-pre-wrap bg-base-200 p-2 rounded mt-1">
+                                      {typeof log.old_values === "string"
+                                        ? log.old_values
+                                        : JSON.stringify(
+                                            JSON.parse(log.old_values),
+                                            null,
+                                            2
+                                          )}
+                                    </pre>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </details>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="text-center text-gray-500 py-8">
+                      No audit logs found. Logs will appear here as users
+                      perform actions.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {auditLogs.length > 0 && (
+            <div className="flex justify-center">
+              <div className="join">
+                <button className="join-item btn">«</button>
+                <button className="join-item btn">Page 1</button>
+                <button className="join-item btn">»</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -494,9 +844,9 @@ function Admin() {
             {editingUser ? "Edit User" : "Add New User"}
           </h3>
           <form onSubmit={handleUserSubmit} className="space-y-4">
-            <div className="form-control">
-              <label className="label">
-                <span className="label-text">Username</span>
+            <div className="form-control ">
+              <label className="label w-32">
+                <span className="label-text">Username:</span>
               </label>
               <input
                 type="text"
@@ -511,8 +861,8 @@ function Admin() {
             </div>
 
             <div className="form-control">
-              <label className="label">
-                <span className="label-text">Email</span>
+              <label className="label w-32">
+                <span className="label-text">Email:</span>
               </label>
               <input
                 type="email"
@@ -527,8 +877,8 @@ function Admin() {
             </div>
 
             <div className="form-control">
-              <label className="label">
-                <span className="label-text">Role</span>
+              <label className="label w-32">
+                <span className="label-text">Role:</span>
               </label>
               <select
                 className="select select-bordered"
@@ -540,13 +890,14 @@ function Admin() {
               >
                 <option value="user">User</option>
                 <option value="admin">Admin</option>
+                <option value="staff">Staff</option>
               </select>
             </div>
 
             {!editingUser && (
               <div className="form-control">
-                <label className="label">
-                  <span className="label-text">Password</span>
+                <label className="label w-32">
+                  <span className="label-text">Initial Password:</span>
                 </label>
                 <input
                   type="password"

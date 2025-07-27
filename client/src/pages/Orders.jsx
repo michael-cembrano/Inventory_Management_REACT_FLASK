@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import LoadingScreen from "../components/LoadingScreen";
 import ApiService from "../services/api";
 
-function Orders() {  const [isLoading, setIsLoading] = useState(true);
+function Orders() {
+  const [isLoading, setIsLoading] = useState(true);
   const [orders, setOrders] = useState([]);
   const [inventory, setInventory] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -18,12 +19,13 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
     customer_email: "",
     customer_phone: "",
     status: "pending",
-    items: []
+    items: [],
   });
   const [currentOrderItem, setCurrentOrderItem] = useState({
     inventory_id: "",
     quantity: 1,
-    price: ""
+    price_per_uom: "",
+    unit_of_measure: "pcs",
   });
   useEffect(() => {
     fetchOrders();
@@ -71,11 +73,16 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
   const handleItemChange = (e) => {
     const { name, value } = e.target;
     if (name === "inventory_id") {
-      const selectedItem = inventory.find(item => item.id === parseInt(value));
+      const selectedItem = inventory.find(
+        (item) => item.id === parseInt(value)
+      );
       setCurrentOrderItem({
         ...currentOrderItem,
         [name]: value,
-        price: selectedItem ? selectedItem.price : ""
+        price_per_uom: selectedItem
+          ? selectedItem.price_per_uom || selectedItem.price
+          : "",
+        unit_of_measure: selectedItem ? selectedItem.unit_of_measure : "pcs",
       });
     } else {
       setCurrentOrderItem({
@@ -91,34 +98,50 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
       return;
     }
 
-    const selectedInventory = inventory.find(item => item.id === parseInt(currentOrderItem.inventory_id));
+    const selectedInventory = inventory.find(
+      (item) => item.id === parseInt(currentOrderItem.inventory_id)
+    );
     if (!selectedInventory) {
       setError("Invalid inventory item selected");
       return;
     }
 
     if (parseInt(currentOrderItem.quantity) > selectedInventory.quantity) {
-      setError(`Only ${selectedInventory.quantity} units available in stock`);
+      setError(
+        `Only ${selectedInventory.quantity} ${selectedInventory.unit_of_measure} available in stock`
+      );
       return;
     }
+
+    const pricePerUom = parseFloat(
+      currentOrderItem.price_per_uom ||
+        selectedInventory.price_per_uom ||
+        selectedInventory.price
+    );
+    const quantity = parseInt(currentOrderItem.quantity);
+    const total = pricePerUom * quantity;
 
     const newItem = {
       inventory_id: parseInt(currentOrderItem.inventory_id),
       inventory_name: selectedInventory.name,
-      quantity: parseInt(currentOrderItem.quantity),
-      price: parseFloat(currentOrderItem.price || selectedInventory.price),
-      total: parseFloat(currentOrderItem.price || selectedInventory.price) * parseInt(currentOrderItem.quantity)
+      quantity: quantity,
+      price: pricePerUom, // Legacy field for compatibility
+      price_per_uom: pricePerUom,
+      unit_of_measure: currentOrderItem.unit_of_measure,
+      total: total,
+      formatted_quantity: `${quantity} ${currentOrderItem.unit_of_measure}`,
     };
 
     setFormData({
       ...formData,
-      items: [...formData.items, newItem]
+      items: [...formData.items, newItem],
     });
 
     setCurrentOrderItem({
       inventory_id: "",
       quantity: 1,
-      price: ""
+      price_per_uom: "",
+      unit_of_measure: "pcs",
     });
     setError("");
   };
@@ -127,12 +150,14 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
     const updatedItems = formData.items.filter((_, i) => i !== index);
     setFormData({
       ...formData,
-      items: updatedItems
+      items: updatedItems,
     });
   };
 
   const calculateOrderTotal = () => {
-    return formData.items.reduce((total, item) => total + item.total, 0).toFixed(2);
+    return formData.items
+      .reduce((total, item) => total + item.total, 0)
+      .toFixed(2);
   };
 
   const handleAddEdit = (order = null) => {
@@ -143,7 +168,7 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
         customer_email: order.customer_email || "",
         customer_phone: order.customer_phone || "",
         status: order.status || "pending",
-        items: order.items || []
+        items: order.items || [],
       });
     } else {
       setFormData({
@@ -151,13 +176,14 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
         customer_email: "",
         customer_phone: "",
         status: "pending",
-        items: []
+        items: [],
       });
     }
     setCurrentOrderItem({
       inventory_id: "",
       quantity: 1,
-      price: ""
+      price_per_uom: "",
+      unit_of_measure: "pcs",
     });
     setIsModalOpen(true);
     setError("");
@@ -179,7 +205,7 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
           customer_name: formData.customer_name,
           customer_email: formData.customer_email,
           customer_phone: formData.customer_phone,
-          status: formData.status
+          status: formData.status,
         };
         await ApiService.updateOrder(editingOrder.id, updateData);
       } else {
@@ -195,7 +221,7 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
         customer_email: "",
         customer_phone: "",
         status: "pending",
-        items: []
+        items: [],
       });
     } catch (error) {
       setError(error.message);
@@ -205,13 +231,12 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
   };
 
   const filteredOrders = orders
-    .filter((order) =>
-      order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.id.toString().includes(searchTerm)
+    .filter(
+      (order) =>
+        order.customer_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.id.toString().includes(searchTerm)
     )
-    .filter((order) =>
-      statusFilter ? order.status === statusFilter : true
-    )
+    .filter((order) => (statusFilter ? order.status === statusFilter : true))
     .sort((a, b) => {
       switch (sortBy) {
         case "created_at_desc":
@@ -237,18 +262,18 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
       processing: { text: "Processing", class: "badge-info" },
       shipped: { text: "Shipped", class: "badge-primary" },
       delivered: { text: "Delivered", class: "badge-success" },
-      cancelled: { text: "Cancelled", class: "badge-error" }
+      cancelled: { text: "Cancelled", class: "badge-error" },
     };
     return statusConfig[status] || { text: status, class: "badge-ghost" };
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(dateString).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
@@ -258,10 +283,7 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
     <div className="p-4">
       <div className="flex flex-col md:flex-row justify-between items-center mb-6">
         <h2 className="text-2xl font-bold mb-4 md:mb-0">Order Management</h2>
-        <button 
-          className="btn btn-primary"
-          onClick={() => handleAddEdit()}
-        >
+        <button className="btn btn-primary" onClick={() => handleAddEdit()}>
           Create New Order
         </button>
       </div>
@@ -269,7 +291,7 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
       {error && (
         <div className="alert alert-error mb-4">
           <span>{error}</span>
-          <button 
+          <button
             className="btn btn-sm btn-circle btn-ghost ml-auto"
             onClick={() => setError("")}
           >
@@ -287,7 +309,7 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <select 
+          <select
             className="select select-bordered"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -299,7 +321,7 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
             <option value="delivered">Delivered</option>
             <option value="cancelled">Cancelled</option>
           </select>
-          <select 
+          <select
             className="select select-bordered"
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
@@ -339,7 +361,9 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
                   <td>
                     <div className="font-semibold">{order.customer_name}</div>
                     {order.customer_email && (
-                      <div className="text-sm text-base-content/70">{order.customer_email}</div>
+                      <div className="text-sm text-base-content/70">
+                        {order.customer_email}
+                      </div>
                     )}
                   </td>
                   <td>
@@ -349,11 +373,15 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
                   </td>
                   <td>
                     <div className="flex flex-col">
-                      <span className="font-semibold">{order.items?.length || 0} items</span>
+                      <span className="font-semibold">
+                        {order.items?.length || 0} items
+                      </span>
                       {order.items && order.items.length > 0 && (
                         <div className="text-xs text-base-content/70">
                           {order.items.slice(0, 2).map((item, idx) => (
-                            <div key={idx}>{item.inventory_name} x{item.quantity}</div>
+                            <div key={idx}>
+                              {item.inventory_name} x{item.quantity}
+                            </div>
                           ))}
                           {order.items.length > 2 && (
                             <div>+{order.items.length - 2} more...</div>
@@ -370,12 +398,10 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
                   <td className="font-semibold text-primary">
                     ${parseFloat(order.total || 0).toFixed(2)}
                   </td>
-                  <td className="text-sm">
-                    {formatDate(order.created_at)}
-                  </td>
+                  <td className="text-sm">{formatDate(order.created_at)}</td>
                   <td>
                     <div className="flex gap-2">
-                      <button 
+                      <button
                         className="btn btn-sm btn-outline"
                         onClick={() => handleAddEdit(order)}
                       >
@@ -395,14 +421,11 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
           <div className="text-6xl mb-4">📋</div>
           <h3 className="text-xl font-semibold mb-2">No orders found</h3>
           <p className="text-base-content/70 mb-4">
-            {searchTerm || statusFilter 
-              ? "Try adjusting your search or filter criteria" 
+            {searchTerm || statusFilter
+              ? "Try adjusting your search or filter criteria"
               : "Get started by creating your first order"}
           </p>
-          <button 
-            className="btn btn-primary"
-            onClick={() => handleAddEdit()}
-          >
+          <button className="btn btn-primary" onClick={() => handleAddEdit()}>
             Create Your First Order
           </button>
         </div>
@@ -415,7 +438,7 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
             <h3 className="font-bold text-lg mb-4">
               {editingOrder ? "Edit Order" : "Create New Order"}
             </h3>
-            
+
             {error && (
               <div className="alert alert-error mb-4">
                 <span>{error}</span>
@@ -498,11 +521,11 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
               {!editingOrder && (
                 <div className="mb-6">
                   <h4 className="font-semibold mb-3">Order Items</h4>
-                  
+
                   {/* Add Item Form */}
                   <div className="bg-base-200 p-4 rounded-lg mb-4">
                     <h5 className="font-medium mb-2">Add Item</h5>
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                       <div className="form-control">
                         <select
                           name="inventory_id"
@@ -513,12 +536,13 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
                         >
                           <option value="">Select Product</option>
                           {inventory
-                            .filter(item => item.quantity > 0)
+                            .filter((item) => item.quantity > 0)
                             .map((item) => (
-                            <option key={item.id} value={item.id}>
-                              {item.name} (Stock: {item.quantity})
-                            </option>
-                          ))}
+                              <option key={item.id} value={item.id}>
+                                {item.name} (Stock: {item.quantity}{" "}
+                                {item.unit_of_measure})
+                              </option>
+                            ))}
                         </select>
                       </div>
                       <div className="form-control">
@@ -532,19 +556,41 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
                           min="1"
                           disabled={isSubmitting}
                         />
+                        <div className="label">
+                          <span className="label-text-alt">
+                            {currentOrderItem.unit_of_measure}
+                          </span>
+                        </div>
                       </div>
                       <div className="form-control">
                         <input
                           type="number"
-                          name="price"
-                          placeholder="Price"
+                          name="price_per_uom"
+                          placeholder="Price per unit"
                           className="input input-bordered input-sm"
-                          value={currentOrderItem.price}
+                          value={currentOrderItem.price_per_uom}
                           onChange={handleItemChange}
                           min="0"
-                          step="0.01"
+                          step="0.0001"
                           disabled={isSubmitting}
                         />
+                        <div className="label">
+                          <span className="label-text-alt">
+                            per {currentOrderItem.unit_of_measure}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="form-control">
+                        <div className="input input-bordered input-sm bg-base-300">
+                          $
+                          {(
+                            (parseFloat(currentOrderItem.price_per_uom) || 0) *
+                            (parseInt(currentOrderItem.quantity) || 0)
+                          ).toFixed(2)}
+                        </div>
+                        <div className="label">
+                          <span className="label-text-alt">Total</span>
+                        </div>
                       </div>
                       <button
                         type="button"
@@ -565,7 +611,7 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
                           <tr>
                             <th>Product</th>
                             <th>Quantity</th>
-                            <th>Price</th>
+                            <th>Price per Unit</th>
                             <th>Total</th>
                             <th>Action</th>
                           </tr>
@@ -574,8 +620,16 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
                           {formData.items.map((item, index) => (
                             <tr key={index}>
                               <td>{item.inventory_name}</td>
-                              <td>{item.quantity}</td>
-                              <td>${item.price.toFixed(2)}</td>
+                              <td>
+                                {item.formatted_quantity ||
+                                  `${item.quantity} ${
+                                    item.unit_of_measure || "pcs"
+                                  }`}
+                              </td>
+                              <td>
+                                ${(item.price_per_uom || item.price).toFixed(4)}{" "}
+                                per {item.unit_of_measure || "pcs"}
+                              </td>
                               <td>${item.total.toFixed(2)}</td>
                               <td>
                                 <button
@@ -615,9 +669,16 @@ function Orders() {  const [isLoading, setIsLoading] = useState(true);
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={isSubmitting || (!editingOrder && formData.items.length === 0)}
+                  disabled={
+                    isSubmitting ||
+                    (!editingOrder && formData.items.length === 0)
+                  }
                 >
-                  {isSubmitting ? "Saving..." : (editingOrder ? "Update Order" : "Create Order")}
+                  {isSubmitting
+                    ? "Saving..."
+                    : editingOrder
+                    ? "Update Order"
+                    : "Create Order"}
                 </button>
               </div>
             </form>

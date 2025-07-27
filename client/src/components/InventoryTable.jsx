@@ -6,10 +6,13 @@ function InventoryTable({ onEdit, onRefresh }) {
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  
+
   // Debug props
   useEffect(() => {
-    console.log("InventoryTable props:", { onEdit: !!onEdit, onRefresh: !!onRefresh });
+    console.log("InventoryTable props:", {
+      onEdit: !!onEdit,
+      onRefresh: !!onRefresh,
+    });
   }, [onEdit, onRefresh]);
 
   useEffect(() => {
@@ -21,9 +24,9 @@ function InventoryTable({ onEdit, onRefresh }) {
       setError("");
       const [inventoryRes, categoriesRes] = await Promise.all([
         ApiService.getInventory().catch(() => ({ inventory: [] })),
-        ApiService.getCategories().catch(() => ({ categories: [] }))
+        ApiService.getCategories().catch(() => ({ categories: [] })),
       ]);
-      
+
       setInventory(inventoryRes.inventory?.slice(0, 5) || []);
       setCategories(categoriesRes.categories || []);
     } catch (error) {
@@ -35,38 +38,44 @@ function InventoryTable({ onEdit, onRefresh }) {
   };
 
   const getCategoryName = (categoryId) => {
-    const category = categories.find(cat => cat.id === categoryId);
-    return category ? category.name : 'Unknown';
+    const category = categories.find((cat) => cat.id === categoryId);
+    return category ? category.name : "Unknown";
   };
-  
+
   const handleEdit = (item) => {
     console.log("Edit button clicked for item:", item); // Debug log
     console.log("onEdit function exists:", typeof onEdit); // Debug log
-    if (onEdit && typeof onEdit === 'function') {
+    if (onEdit && typeof onEdit === "function") {
       console.log("Calling onEdit function..."); // Debug log
       onEdit(item);
     } else {
-      console.warn("onEdit prop not provided to InventoryTable or is not a function");
-      alert("Edit functionality not configured properly. Check console for details.");
+      console.warn(
+        "onEdit prop not provided to InventoryTable or is not a function"
+      );
+      alert(
+        "Edit functionality not configured properly. Check console for details."
+      );
     }
   };
 
   const handleDelete = async (itemId, itemName) => {
     console.log("Delete button clicked for item:", itemId, itemName); // Debug log
     console.log("onRefresh function exists:", typeof onRefresh); // Debug log
-    
+
     if (window.confirm(`Are you sure you want to delete "${itemName}"?`)) {
       try {
         console.log("Attempting to delete item..."); // Debug log
         await ApiService.deleteInventoryItem(itemId);
         console.log("Item deleted successfully, refreshing table..."); // Debug log
         await fetchInventory(); // Refresh the table
-        
-        if (onRefresh && typeof onRefresh === 'function') {
+
+        if (onRefresh && typeof onRefresh === "function") {
           console.log("Calling onRefresh function..."); // Debug log
           onRefresh(); // Notify parent component to refresh
         } else {
-          console.warn("onRefresh prop not provided to InventoryTable or is not a function");
+          console.warn(
+            "onRefresh prop not provided to InventoryTable or is not a function"
+          );
         }
       } catch (error) {
         console.error("Error deleting item:", error);
@@ -90,10 +99,7 @@ function InventoryTable({ onEdit, onRefresh }) {
         <div className="p-8 text-center">
           <div className="alert alert-error">
             <span>{error}</span>
-            <button 
-              className="btn btn-sm btn-outline"
-              onClick={fetchInventory}
-            >
+            <button className="btn btn-sm btn-outline" onClick={fetchInventory}>
               Retry
             </button>
           </div>
@@ -107,7 +113,7 @@ function InventoryTable({ onEdit, onRefresh }) {
         <div className="text-center py-8">
           <div className="text-4xl mb-2">📦</div>
           <p className="text-base-content/70">No inventory items found</p>
-          <button 
+          <button
             className="btn btn-sm btn-outline mt-2"
             onClick={fetchInventory}
           >
@@ -121,17 +127,41 @@ function InventoryTable({ onEdit, onRefresh }) {
               <th>Item Name</th>
               <th>Category</th>
               <th>Stock</th>
-              <th>Price</th>
+              <th>Price/UOM</th>
+              <th>Total Value</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
-          </thead><tbody>
+          </thead>
+          <tbody>
             {inventory.map((item) => (
               <tr key={item.id}>
                 <td>{item.name}</td>
                 <td>{getCategoryName(item.category_id)}</td>
-                <td>{item.quantity}</td>
-                <td>${parseFloat(item.price).toFixed(2)}</td>
+                <td>
+                  <div className="flex flex-col">
+                    <span className="font-medium">{item.quantity}</span>
+                    <span className="text-xs text-base-content/70">
+                      {item.unit_of_measure || "pcs"}
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  <div className="flex flex-col">
+                    <span className="font-medium">
+                      ${parseFloat(item.price_per_uom || item.price).toFixed(4)}
+                    </span>
+                    <span className="text-xs text-base-content/70">
+                      per {item.unit_of_measure || "pcs"}
+                    </span>
+                  </div>
+                </td>
+                <td>
+                  $
+                  {((item.price_per_uom || item.price) * item.quantity).toFixed(
+                    2
+                  )}
+                </td>
                 <td>
                   <div
                     className={`badge ${
@@ -151,7 +181,7 @@ function InventoryTable({ onEdit, onRefresh }) {
                 </td>
                 <td>
                   <div className="join">
-                    <button 
+                    <button
                       className="btn btn-sm join-item"
                       onClick={(e) => {
                         e.preventDefault();
@@ -162,7 +192,7 @@ function InventoryTable({ onEdit, onRefresh }) {
                     >
                       Edit
                     </button>
-                    <button 
+                    <button
                       className="btn btn-sm join-item btn-error"
                       onClick={(e) => {
                         e.preventDefault();

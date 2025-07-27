@@ -195,28 +195,41 @@ class ApiService {
     });
   }
   async getSystemSettings() {
-    return this.request('/admin/system-stats');
+    return this.request('/admin/settings');
   }
 
   async updateSystemSettings(settings) {
-    return this.request('/admin/system-stats', {
+    return this.request('/admin/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),
     });
   }
 
   async getAuditLogs() {
-    return this.request('/admin/audit-logs');
+    return this.request('/admin/logs');
   }
 
   async getSystemStats() {
-    return this.request('/admin/system-stats');
+    return this.request('/admin/stats');
   }
 
   async backupDatabase() {
-    return this.request('/admin/backup', {
-      method: 'POST',
-    });
+    try {
+      console.log('Starting database backup...');
+      const response = await this.request('/admin/backup', {
+        method: 'POST',
+        headers: {
+          ...this.getHeaders(),
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'Content-Type, Authorization'
+        }
+      });
+      console.log('Backup completed successfully:', response);
+      return response;
+    } catch (error) {
+      console.error('Backup failed:', error);
+      throw error;
+    }
   }
 
   // Vendors
@@ -288,6 +301,23 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify(receiveData),
     });
+  }
+
+  // Analytics endpoints
+  async getDashboardStats() {
+    return this.request('/analytics/dashboard-stats');
+  }
+
+  async getMonthlyTrends() {
+    return this.request('/analytics/monthly-trends');
+  }
+
+  async getLowStockItems() {
+    return this.request('/analytics/low-stock');
+  }
+
+  async getInventoryValue() {
+    return this.request('/analytics/inventory-value');
   }
 }
 
