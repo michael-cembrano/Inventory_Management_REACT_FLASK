@@ -337,6 +337,6 @@ npm install --force
 
 ---
 
-Made with ❤️ by [Your Name]
+Made with ❤️ by Cem
 
 **Happy Inventorying! 📦✨**
